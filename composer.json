@@ -4,6 +4,11 @@
     "type": "library",
     "license": "MIT",
     "keywords": ["laravel", "livewire", "volt", "admin", "auth", "tailwind", "ui-kit"],
+    "homepage": "https://github.com/shipbytes/laravel-ui-kit",
+    "support": {
+        "issues": "https://github.com/shipbytes/laravel-ui-kit/issues",
+        "source": "https://github.com/shipbytes/laravel-ui-kit"
+    },
     "authors": [
         {
             "name": "Abhishek",

@@ -1,10 +1,8 @@
 # Laravel UI Kit
 
-Admin panel + auth UI scaffolding for Laravel 10/11/12/13 with Livewire 3, Volt, Fortify, and Tailwind 3. Extracted from ResumeOpen.
+Admin panel + auth UI scaffolding for Laravel 10/11/12/13 with Livewire 3, Volt, Fortify, and Tailwind 3.
 
-## Status
-
-- **v0.1 (unreleased)** — Core + all 9 optional modules are implemented. CI matrix runs L10/L11/L12 × PHP 8.1–8.4. Smoke-tested on a fresh Laravel 12 install.
+Core + 9 optional modules, installed interactively via `php artisan ui-kit:install`. CI covers PHP 8.1–8.4 × Laravel 10/11/12. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## What you get
 
@@ -39,6 +37,55 @@ Every module prints a numbered **Next steps** checklist after `ui-kit:install-mo
 
 > ⚠️ **Laravel 10 is past its security window.** The package supports it for compatibility, but new projects should target L11+.
 
+## Before you install — fresh vs. existing app
+
+The kit is designed for **fresh Laravel installs** (no auth scaffolding yet). Running it on top of Breeze, Jetstream, or a custom auth setup will collide.
+
+The installer does a **preflight check** for you — it reads your `composer.lock` for `laravel/breeze` / `laravel/jetstream` and scans for colliding file paths (`routes/auth.php`, `app/Livewire/Forms/LoginForm.php`, `resources/views/livewire/pages/auth/*`). Behaviour:
+
+- **Jetstream detected** → aborts. Pass `--force` to override (not recommended).
+- **Breeze detected** (or stray auth files) → warns, lists the collisions, and prompts you to confirm.
+- Running `--no-interaction` with collisions present → aborts unless `--force` is set. Keeps CI safe.
+
+### ✅ Do install on
+
+- **A fresh `laravel new` project** with no auth starter. Zero conflicts, ~2 minutes to a working admin + auth UI.
+- **An existing app that has no auth UI yet** (e.g. an API-only app you're now adding an admin panel to). You'll still want to uninstall any partial auth views from `resources/views/auth/` first.
+
+### ⚠️ Avoid installing on top of
+
+- **Breeze (any stack)** — collides on `routes/auth.php`, `app/Livewire/Forms/LoginForm.php` (Breeze Livewire), and `resources/views/livewire/pages/auth/*`. Without `--force` Laravel silently skips them, leaving you with Breeze's code running under this kit's layouts — usually broken. With `--force`, Breeze is overwritten and may leave orphaned files behind.
+- **Jetstream** — heavy footprint (teams, API tokens, Sanctum-based auth) that this kit doesn't understand. Do not combine.
+- **An app with customized Fortify views/actions** — your customizations will either be skipped or overwritten depending on `--force`.
+
+If you *must* use the kit on top of an existing auth setup, remove the starter first:
+
+```bash
+# Breeze — no official uninstaller, remove by hand:
+composer remove laravel/breeze
+rm -rf app/Http/Controllers/Auth resources/views/auth routes/auth.php
+rm -f app/Livewire/Forms/LoginForm.php app/Livewire/Actions/Logout.php
+rm -rf resources/views/livewire/pages/auth resources/views/components/{input-error,input-label,primary-button,text-input}.blade.php
+
+# Jetstream — no uninstaller, migration is significant. Start from a fresh app.
+```
+
+Then run the kit installer. Review the generated files before committing — merge anything you wanted to keep from your old setup by hand.
+
+### What the installer publishes (so you can eyeball conflicts)
+
+| Destination | From |
+|---|---|
+| `config/ui-kit.php`, `config/admin.php` | kit-specific, safe |
+| `resources/views/layouts/*`, `components/auth-session-status.blade.php` | **collides with Breeze** |
+| `resources/views/livewire/pages/auth/*` | **collides with Breeze Livewire** |
+| `resources/views/livewire/admin/*` | kit-specific, safe |
+| `app/Livewire/Admin/*`, `app/Livewire/Forms/LoginForm.php` | **`LoginForm` collides with Breeze Livewire** |
+| `routes/auth.php` | **collides with Breeze** |
+| `routes/admin.php` | kit-specific, safe |
+| `resources/js/ui-kit.js`, `resources/css/ui-kit.css` | kit-specific, safe |
+| `database/migrations/..._add_is_admin_to_users_table.php` | kit-specific, timestamped, safe |
+
 ## Install
 
 ```bash
@@ -47,6 +94,36 @@ php artisan ui-kit:install
 ```
 
 The installer walks you through an interactive module picker. Run `php artisan ui-kit:install --modules=admin-middleware,profile` to skip the prompt.
+
+<details>
+<summary><strong>Installing before a Packagist release (or straight from GitHub / a local path)</strong></summary>
+
+Until a version is tagged and submitted to Packagist, or if you're hacking on the kit locally, point Composer at the source directly.
+
+**From GitHub (VCS repository)** — good for tracking `main`:
+
+```bash
+composer config repositories.laravel-ui-kit vcs https://github.com/shipbytes/laravel-ui-kit
+composer config minimum-stability dev
+composer config prefer-stable true
+composer require "shipbytes/laravel-ui-kit:dev-main"
+```
+
+**From a local checkout (path repository)** — good for contributors; symlinks the source into `vendor/` so edits are live:
+
+```bash
+composer config repositories.laravel-ui-kit path /absolute/path/to/laravel-ui-kit
+composer require "shipbytes/laravel-ui-kit:*"
+```
+
+If symlinking causes trouble (e.g. WSL file-permission quirks), disable it:
+
+```bash
+composer config repositories.laravel-ui-kit '{"type":"path","url":"/absolute/path/to/laravel-ui-kit","options":{"symlink":false}}'
+composer update shipbytes/laravel-ui-kit
+```
+
+</details>
 
 ### Finish wiring
 
@@ -159,14 +236,6 @@ GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX
 # --- Analytics module: PostHog (only if you installed analytics+posthog) -
 POSTHOG_PUBLIC_KEY=phc_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 POSTHOG_HOST=https://us.i.posthog.com   # or https://eu.i.posthog.com
-
-# --- Socialite (only if you flip ui-kit.features.socialite to true) ------
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
-LINKEDIN_CLIENT_ID=
-LINKEDIN_CLIENT_SECRET=
-LINKEDIN_REDIRECT_URI="${APP_URL}/auth/linkedin/callback"
 ```
 
 ### Mail (for auth emails)
@@ -264,37 +333,6 @@ $this->dispatch('posthog-capture', event: 'ticket_replied', properties: [
 
 No external service or key needed. Once you register the middleware, anyone who hits your site with `?utm_source=…&utm_medium=…&utm_campaign=…` on the URL gets the values stashed in their session (and attached to the User model on signup). The UTM Link Builder page (`/admin/analytics/utm`) generates tagged URLs for your campaigns.
 
-### Socialite (Google / LinkedIn login)
-
-The kit ships **social login buttons** (`social-buttons` partial) that render on login/register when you set `ui-kit.features.socialite` to `true`. The buttons point at a `social.redirect` route, which **you implement** — the package intentionally doesn't ship an opinionated Socialite controller.
-
-If you want to enable it:
-
-1. `composer require laravel/socialite`
-2. **Google**: go to [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth client ID** → type **Web application**. Add `${APP_URL}/auth/google/callback` to authorized redirect URIs. Copy the client ID + secret.
-3. **LinkedIn**: go to [LinkedIn Developers](https://www.linkedin.com/developers/apps) → **Create app**. Under **Auth**, add `${APP_URL}/auth/linkedin/callback` as a redirect URL. Copy the client ID + secret.
-4. Paste all four values into `.env` (see the `.env` reference block above).
-5. Add the Socialite services config:
-   ```php
-   // config/services.php
-   'google' => [
-       'client_id'     => env('GOOGLE_CLIENT_ID'),
-       'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-       'redirect'      => env('GOOGLE_REDIRECT_URI'),
-   ],
-   'linkedin' => [
-       'client_id'     => env('LINKEDIN_CLIENT_ID'),
-       'client_secret' => env('LINKEDIN_CLIENT_SECRET'),
-       'redirect'      => env('LINKEDIN_REDIRECT_URI'),
-   ],
-   ```
-6. Implement a `social.redirect` + `social.callback` controller per the [Socialite docs](https://laravel.com/docs/socialite).
-7. Flip the feature flag:
-   ```php
-   // config/ui-kit.php
-   'features' => ['socialite' => true],
-   ```
-
 ## Installing modules later
 
 ```bash
@@ -362,6 +400,6 @@ vendor/bin/phpunit
 
 Tests run against Orchestra Testbench. CI (`.github/workflows/tests.yml`) matrixes PHP 8.1–8.4 × Laravel 10/11/12.
 
-## Credits
+## License
 
-Extracted from [ResumeOpen](https://github.com/shipbytes/resumeopen)'s admin + auth layers.
+MIT — see [LICENSE](LICENSE).
