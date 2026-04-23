@@ -4,7 +4,7 @@ Admin panel + auth UI scaffolding for Laravel 10/11/12/13 with Livewire 3, Volt,
 
 ## Status
 
-- **v0.1 (unreleased)** — Core + all 9 optional modules are implemented. CI matrix runs L10/L11/L12 × PHP 8.1–8.4. Not yet smoke-tested on a fresh Laravel install.
+- **v0.1 (unreleased)** — Core + all 9 optional modules are implemented. CI matrix runs L10/L11/L12 × PHP 8.1–8.4. Smoke-tested on a fresh Laravel 12 install.
 
 ## What you get
 
@@ -35,6 +35,7 @@ Every module prints a numbered **Next steps** checklist after `ui-kit:install-mo
 - PHP 8.1+
 - Laravel 10, 11, 12, or 13
 - Livewire 3 + Volt 1.x
+- Node 18+ (for Vite / Tailwind build)
 
 > ⚠️ **Laravel 10 is past its security window.** The package supports it for compatibility, but new projects should target L11+.
 
@@ -49,7 +50,9 @@ The installer walks you through an interactive module picker. Run `php artisan u
 
 ### Finish wiring
 
-1. Add the Tailwind preset:
+Five steps. You'll do these once per project.
+
+1. **Add the Tailwind preset** so your utility classes include the brand palette and dark-mode strategy.
    ```js
    // tailwind.config.js
    module.exports = {
@@ -61,7 +64,7 @@ The installer walks you through an interactive module picker. Run `php artisan u
        ],
    };
    ```
-2. Import Alpine + CSS into your bundles:
+2. **Import Alpine stores + CSS** into your existing Vite bundles.
    ```js
    // resources/js/app.js
    import './ui-kit';
@@ -70,12 +73,20 @@ The installer walks you through an interactive module picker. Run `php artisan u
    /* resources/css/app.css */
    @import './ui-kit.css';
    ```
-3. Load the admin routes. Add to `bootstrap/app.php` (L11+) or `RouteServiceProvider` (L10):
+3. **Load the admin and auth routes.** Add to `bootstrap/app.php` (L11+) or `RouteServiceProvider` (L10):
    ```php
    Route::middleware('web')->group(base_path('routes/admin.php'));
    Route::middleware('web')->group(base_path('routes/auth.php'));
    ```
-4. `php artisan migrate && npm install && npm run dev`
+4. **Run migrations and build assets.**
+   ```bash
+   php artisan migrate
+   npm install
+   npm run dev    # or: npm run build
+   ```
+5. **Configure mail** (see [Mail (for auth emails)](#mail-for-auth-emails) below) so password-reset and email-verification links actually get delivered.
+
+That's the whole happy path. You should be able to hit `/register`, `/login`, and `/admin` immediately.
 
 ## Configuration
 
@@ -85,10 +96,12 @@ The installer walks you through an interactive module picker. Run `php artisan u
 // config/ui-kit.php
 'brand' => [
     'name' => env('UI_KIT_BRAND_NAME', config('app.name')),
-    'logo' => '/images/logo.png',
-    'home_route' => 'dashboard',
+    'logo' => env('UI_KIT_BRAND_LOGO', '/images/logo.png'),
+    'home_route' => env('UI_KIT_HOME_ROUTE', 'home'),
 ],
 ```
+
+Drop your logo PNG/SVG at `public/images/logo.png` (or override `UI_KIT_BRAND_LOGO` to point anywhere else). `home_route` is the route name used by the "back to site" link in the admin shell.
 
 ### Sidebar navigation
 
@@ -102,20 +115,185 @@ The installer walks you through an interactive module picker. Run `php artisan u
 ],
 ```
 
-Each installed module appends its own entries.
+Each installed module's `Next steps` checklist tells you the exact nav entry to paste.
 
 ### Sidebar badges
 
-Bind your own resolver:
+Bind your own resolver so sidebar counters (e.g. "open tickets: 12") reflect your data:
 
 ```php
+// In a service provider
 $this->app->bind(
     \Shipbytes\UiKit\Contracts\SidebarBadgeResolver::class,
     \App\Support\AdminBadgeResolver::class,
 );
 ```
 
-The resolver returns `['open_tickets' => 12, ...]` — keys match the `badge` field on nav items.
+The resolver returns `['open_tickets' => 12, 'unread_contacts' => 3, ...]` — keys match the `badge` field on nav items.
+
+## Environment & credentials
+
+This section is a single place to see **every `.env` key** the kit can read, with links to where to generate the values. Only the **Mail** block is required for a production-ready install; everything else depends on which modules you enable.
+
+### `.env` reference
+
+```dotenv
+# --- Branding (all optional; sensible defaults if unset) -----------------
+UI_KIT_BRAND_NAME="Acme"
+UI_KIT_BRAND_LOGO="/images/logo.png"
+UI_KIT_HOME_ROUTE="home"
+
+# --- Mail (required for password reset, email verification) --------------
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.mailgun.org
+MAIL_PORT=587
+MAIL_USERNAME=postmaster@mg.example.com
+MAIL_PASSWORD=your-smtp-password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="noreply@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+# --- Analytics module: GA4 (only if you installed analytics+ga4) ---------
+GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX
+
+# --- Analytics module: PostHog (only if you installed analytics+posthog) -
+POSTHOG_PUBLIC_KEY=phc_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+POSTHOG_HOST=https://us.i.posthog.com   # or https://eu.i.posthog.com
+
+# --- Socialite (only if you flip ui-kit.features.socialite to true) ------
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
+LINKEDIN_CLIENT_ID=
+LINKEDIN_CLIENT_SECRET=
+LINKEDIN_REDIRECT_URI="${APP_URL}/auth/linkedin/callback"
+```
+
+### Mail (for auth emails)
+
+Fortify sends password-reset and email-verification messages through Laravel's mailer. Out of the box, `MAIL_MAILER=log` works for local dev (mail goes to `storage/logs/laravel.log`). For production, pick any supported driver — Mailgun, Postmark, SES, Resend, or SMTP. See the [Laravel mail docs](https://laravel.com/docs/mail) for driver-specific setup.
+
+If you don't configure mail, the UI will appear to work but users will never receive verification or reset emails.
+
+### GA4 (Google Analytics 4)
+
+**1. Generate a Measurement ID.**
+1. Go to [analytics.google.com](https://analytics.google.com).
+2. Admin (gear icon, bottom-left) → **Create** → **Property** (or pick an existing one).
+3. Inside the property: **Data streams** → **Add stream** → **Web** → enter your site URL.
+4. Copy the **Measurement ID**. It looks like `G-XXXXXXXXXX`.
+
+**2. Paste it into `.env`.**
+
+```dotenv
+GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX
+```
+
+**3. Register the config key** in `config/services.php` (add this once):
+
+```php
+'google' => [
+    'analytics_id' => env('GOOGLE_ANALYTICS_ID'),
+],
+```
+
+**4. Include the loader** in your app layout, just before `</head>`:
+
+```blade
+@include('partials.ga4')
+```
+
+**5. Consent gating.** The loader only fires once a `cookie_consent=accepted` cookie is present. Set that cookie from your consent banner (or manually in dev via DevTools) — otherwise the GA4 script never runs. This is intentional so you're GDPR/CCPA-ready.
+
+Verify it's working: open your site, accept the cookie banner, and watch **Realtime** in the GA4 UI. You should see yourself within ~30 seconds.
+
+### PostHog
+
+**1. Grab your Project API Key.**
+1. Sign up / log in at [posthog.com](https://posthog.com) (or run self-hosted).
+2. Pick the project you want to track into.
+3. **Settings** (gear icon, bottom-left) → **Project** → **General** → copy **Project API Key**. It starts with `phc_…`.
+4. Note your **host**: `https://us.i.posthog.com` for PostHog Cloud US, `https://eu.i.posthog.com` for EU, or your own URL for self-hosted.
+
+**2. Paste into `.env`.**
+
+```dotenv
+POSTHOG_PUBLIC_KEY=phc_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+POSTHOG_HOST=https://us.i.posthog.com
+```
+
+**3. Register config keys** in `config/services.php`:
+
+```php
+'posthog' => [
+    'public_key' => env('POSTHOG_PUBLIC_KEY'),
+    'host'       => env('POSTHOG_HOST', 'https://us.i.posthog.com'),
+],
+```
+
+**4. Include the loader** in your app layout, just before `</head>`:
+
+```blade
+@include('partials.posthog')
+```
+
+**5. Install the JS SDK + bridge** so server-side Livewire events can capture PostHog events:
+
+```bash
+npm install posthog-js
+```
+
+```js
+// resources/js/app.js
+import './posthog-bridge';
+```
+
+**6. Capture events from Livewire:**
+
+```php
+$this->dispatch('posthog-capture', event: 'ticket_replied', properties: [
+    'ticket_id' => $ticket->id,
+]);
+```
+
+**7. Consent gating.** Same as GA4 — the loader waits for `cookie_consent=accepted`. Verify in the PostHog **Live events** tab.
+
+> ⚠️ Only use your **public** project key (`phc_…`). The personal / private API key should never land in frontend code.
+
+### UTM tracking (analytics module, UTM provider)
+
+No external service or key needed. Once you register the middleware, anyone who hits your site with `?utm_source=…&utm_medium=…&utm_campaign=…` on the URL gets the values stashed in their session (and attached to the User model on signup). The UTM Link Builder page (`/admin/analytics/utm`) generates tagged URLs for your campaigns.
+
+### Socialite (Google / LinkedIn login)
+
+The kit ships **social login buttons** (`social-buttons` partial) that render on login/register when you set `ui-kit.features.socialite` to `true`. The buttons point at a `social.redirect` route, which **you implement** — the package intentionally doesn't ship an opinionated Socialite controller.
+
+If you want to enable it:
+
+1. `composer require laravel/socialite`
+2. **Google**: go to [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth client ID** → type **Web application**. Add `${APP_URL}/auth/google/callback` to authorized redirect URIs. Copy the client ID + secret.
+3. **LinkedIn**: go to [LinkedIn Developers](https://www.linkedin.com/developers/apps) → **Create app**. Under **Auth**, add `${APP_URL}/auth/linkedin/callback` as a redirect URL. Copy the client ID + secret.
+4. Paste all four values into `.env` (see the `.env` reference block above).
+5. Add the Socialite services config:
+   ```php
+   // config/services.php
+   'google' => [
+       'client_id'     => env('GOOGLE_CLIENT_ID'),
+       'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+       'redirect'      => env('GOOGLE_REDIRECT_URI'),
+   ],
+   'linkedin' => [
+       'client_id'     => env('LINKEDIN_CLIENT_ID'),
+       'client_secret' => env('LINKEDIN_CLIENT_SECRET'),
+       'redirect'      => env('LINKEDIN_REDIRECT_URI'),
+   ],
+   ```
+6. Implement a `social.redirect` + `social.callback` controller per the [Socialite docs](https://laravel.com/docs/socialite).
+7. Flip the feature flag:
+   ```php
+   // config/ui-kit.php
+   'features' => ['socialite' => true],
+   ```
 
 ## Installing modules later
 
@@ -128,7 +306,7 @@ php artisan ui-kit:list-modules
 ## Module deep-dives
 
 ### `admin-middleware`
-Ships `EnsureUserIsAdmin` (Spatie role check) + `IsAdminUser` trait + `AdminRoleSeeder`. Swap the fallback middleware in `config/admin.php`, `vendor:publish` Spatie, migrate, and assign the role.
+Ships `EnsureUserIsAdmin` (Spatie role check) + `IsAdminUser` trait + `AdminRoleSeeder`. After install: publish Spatie config/migrations, migrate, seed the `admin` role, assign it to a user, and swap the middleware binding in `config/admin.php` from the fallback to `App\Http\Middleware\EnsureUserIsAdmin::class`.
 
 ### `support-tickets`
 Admin-only queue (public form is yours to build). Search by name/email, filter by status/priority, inline replies. Mailables are intentionally omitted so you plug in your own notification flow.
@@ -140,21 +318,22 @@ Admin CRUD + public feed helper. HTML sanitization via `mews/purifier`. Each ent
 Inbox for a public contact form that writes to `contact_submissions`. When the `support-tickets` module is also installed, a **Copy to Ticket** button auto-appears — no config needed.
 
 ### `analytics`
-Three providers, install any combo:
-- **UTM** — middleware captures `?utm_*` → session, model + link-builder Livewire page.
-- **GA4** — consent-gated `@include('partials.ga4')` loader.
-- **PostHog** — consent-gated loader + Livewire→PostHog JS bridge (`$this->dispatch('posthog-capture', event: 'x', properties: [...])`).
+Three providers — pick any combination at install time. See [Environment & credentials](#environment--credentials) above for the full GA4 / PostHog setup walkthroughs.
 
-Both GA4 and PostHog gate on `cookie_consent=accepted` — set that cookie from your consent banner.
+- **UTM** — middleware captures `?utm_*` → session, User model columns, and a Livewire-powered link builder at `/admin/analytics/utm`. No external service required.
+- **GA4** — consent-gated `@include('partials.ga4')` loader. Needs `GOOGLE_ANALYTICS_ID`.
+- **PostHog** — consent-gated loader + Livewire→PostHog JS bridge. Needs `POSTHOG_PUBLIC_KEY` (+ optional `POSTHOG_HOST`).
+
+Both GA4 and PostHog loaders gate on `cookie_consent=accepted`. Set that cookie from your consent banner (or your tests).
 
 ### `profile`
-Four Livewire/Volt cards under a single `ProfilePage`: update info + avatar, update password, 2FA (Fortify, auto-hidden if not installed), delete account. Ships `x-modal` and `x-action-message` components. Resizes avatars to 200×200 if `intervention/image` is installed, otherwise stores the raw upload.
+Four Livewire/Volt cards under a single `ProfilePage`: update info + avatar, update password, 2FA (Fortify, auto-hidden if not installed), delete account. Ships `x-modal` and `x-action-message` components. Resizes avatars to 200×200 if `intervention/image` is installed, otherwise stores the raw upload. Don't forget `php artisan storage:link` so `/storage/avatars/...` is publicly reachable.
 
 ### `impersonation`
-Two Blade partials (`impersonation-banner`, `impersonation-button`) over `lab404/laravel-impersonate`. The package auto-registers routes; you just `@include` the banner in your layout and the button in the user detail view.
+Two Blade partials (`impersonation-banner`, `impersonation-button`) over `lab404/laravel-impersonate`. The package auto-registers routes; you just `@include` the banner in your layout and the button in the user detail view. Requires `canImpersonate()` + `canBeImpersonated()` methods on your User model.
 
 ### `activity-log`
-Paginated admin viewer over `spatie/laravel-activitylog`'s `activity_log` table. Filters: log stream, causer email, date range. Add the `LogsActivity` trait on your models per package README.
+Paginated admin viewer over `spatie/laravel-activitylog`'s `activity_log` table. Filters: log stream, causer email, date range. Add the `LogsActivity` trait on your models per [Spatie's README](https://spatie.be/docs/laravel-activitylog).
 
 ### `dark-mode`
 Alpine `$store.theme` ships in core/`ui-kit.js`. Drop `<x-theme-toggle />` anywhere and inline the no-flash snippet before `</head>`. Every core view and every shipped module has `dark:` variants already.
@@ -165,6 +344,14 @@ Alpine `$store.theme` ships in core/`ui-kit.js`. Drop `<x-theme-toggle />` anywh
 - **L11:** middleware registration moved to `bootstrap/app.php`. Post-install notes call out the relevant `bootstrap/app.php` vs `Http/Kernel.php` snippet so you know where to drop in the new middleware.
 - **L12:** current LTS-ish target — the default for new projects using this kit.
 - **L13:** newly released (per PHP/Fortify/Spatie peer-dep readiness). CI runs 10/11/12 until the ecosystem catches up; bump `composer.json` locally if you want to try it early.
+
+## Troubleshooting
+
+- **`/login` returns 500 with "Vite manifest not found"** — run `npm run dev` or `npm run build`. Vite must emit a manifest before Blade's `@vite` directive can resolve it.
+- **Password reset / verification emails never arrive** — check `MAIL_*` in `.env`. In local dev, set `MAIL_MAILER=log` and tail `storage/logs/laravel.log`.
+- **GA4 / PostHog not firing** — open DevTools → Application → Cookies and confirm `cookie_consent=accepted` is set. Both loaders are consent-gated by design.
+- **Sidebar badges show 0 / blank** — bind your own `SidebarBadgeResolver`; the default returns an empty array.
+- **"Unauthorized" on `/admin`** — either the default fallback middleware is rejecting you (it requires `$user->is_admin` to be truthy) or you installed `admin-middleware` and haven't assigned the `admin` role yet.
 
 ## Testing the package
 
