@@ -1,0 +1,21 @@
+/**
+ * UI Kit base styles. Import once from resources/css/app.css:
+ *   @import './ui-kit.css';
+ */
+
+[x-cloak] {
+    display: none !important;
+}
+
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}

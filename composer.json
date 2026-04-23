@@ -1,0 +1,56 @@
+{
+    "name": "shipbytes/laravel-ui-kit",
+    "description": "Admin panel + auth UI kit for Laravel with Livewire 3, Volt, and Tailwind. Modular installers for optional features.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "livewire", "volt", "admin", "auth", "tailwind", "ui-kit"],
+    "authors": [
+        {
+            "name": "Abhishek",
+            "email": "abhiguess@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+        "illuminate/console": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+        "illuminate/view": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+        "illuminate/routing": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+        "laravel/fortify": "^1.21",
+        "laravel/prompts": "^0.1.15 || ^0.2.0 || ^0.3.0",
+        "livewire/livewire": "^3.0",
+        "livewire/volt": "^1.0",
+        "propaganistas/laravel-disposable-email": "^2.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0 || ^9.0 || ^10.0",
+        "phpunit/phpunit": "^10.5 || ^11.0"
+    },
+    "suggest": {
+        "spatie/laravel-permission": "Required when installing the admin-middleware module",
+        "spatie/laravel-activitylog": "Required when installing the activity-log module",
+        "lab404/laravel-impersonate": "Required when installing the impersonation module"
+    },
+    "autoload": {
+        "psr-4": {
+            "Shipbytes\\UiKit\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Shipbytes\\UiKit\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Shipbytes\\UiKit\\UiKitServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
