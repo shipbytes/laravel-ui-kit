@@ -8,7 +8,6 @@ use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\multiselect;
 
 class InstallModuleCommand extends Command
 {
@@ -105,11 +104,74 @@ class InstallModuleCommand extends Command
             return $meta['providers'];
         }
 
-        return multiselect(
-            label: "Which {$meta['label']} providers?",
-            options: array_combine($meta['providers'], $meta['providers']),
-            required: true
-        );
+        return $this->pickProvidersManually($slug, $meta);
+    }
+
+    /**
+     * Plain STDIN-based picker. Mirrors InstallCommand::pickModulesManually()
+     * so we avoid Laravel Prompts' multiselect on terminals where it renders
+     * invisibly (Windows cmd, some WSL emulators).
+     *
+     * @param  array<string, mixed>  $meta
+     * @return array<int, string>
+     */
+    protected function pickProvidersManually(string $slug, array $meta): array
+    {
+        /** @var array<int, string> $providers */
+        $providers = $meta['providers'];
+
+        while (true) {
+            $this->line('');
+            $this->line("<fg=cyan>Available {$meta['label']} providers:</>");
+            foreach ($providers as $i => $provider) {
+                $this->line(sprintf('  <fg=yellow>%2d</>. <info>%s</info>', $i + 1, $provider));
+            }
+            $this->line('');
+            $this->line('Type comma-separated numbers (e.g. <info>1,3</info>) or <info>all</info>:');
+            $this->output->write('> ');
+
+            $line = fgets(STDIN);
+            $input = $line === false ? '' : trim($line);
+
+            if ($input === '') {
+                $this->warn('At least one provider is required.');
+
+                continue;
+            }
+
+            if (strtolower($input) === 'all') {
+                return $providers;
+            }
+
+            $selected = [];
+            $invalid = false;
+
+            foreach (array_filter(array_map('trim', explode(',', $input))) as $pick) {
+                if (! ctype_digit($pick)) {
+                    $this->warn("Invalid entry: {$pick}");
+                    $invalid = true;
+                    break;
+                }
+
+                $idx = (int) $pick - 1;
+
+                if (! isset($providers[$idx])) {
+                    $this->warn("Out of range: {$pick}");
+                    $invalid = true;
+                    break;
+                }
+
+                if (! in_array($providers[$idx], $selected, true)) {
+                    $selected[] = $providers[$idx];
+                }
+            }
+
+            if ($invalid || empty($selected)) {
+                continue;
+            }
+
+            return $selected;
+        }
     }
 
     protected function copyProviderTree(string $slug, string $provider): void

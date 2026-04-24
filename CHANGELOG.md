@@ -6,6 +6,14 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Changed
+- **Module + provider pickers now use plain STDIN** instead of Laravel Prompts'
+  multiselect. The Prompts fallback wasn't reliable on Windows cmd / Laragon
+  (rendered invisibly even with `fallbackWhen(true)`), so we took it out of the
+  critical path entirely. You now get a numbered list and type comma-separated
+  numbers (or `all`). Works on every terminal. `UI_KIT_PROMPTS_FALLBACK` still
+  controls the other Prompts calls (`confirm`, `info`, `note`).
+
 ## [0.1.0] - 2026-04-24
 
 Initial public release.

@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Artisan;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
-use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\warning;
 
@@ -215,15 +214,70 @@ class InstallCommand extends Command
             return [];
         }
 
-        $options = [];
-        foreach ($registry->all() as $slug => $meta) {
-            $options[$slug] = $meta['label'].' — '.$meta['summary'];
+        return $this->pickModulesManually($registry);
+    }
+
+    /**
+     * Render the module list with plain $this->line() + read from STDIN.
+     *
+     * We deliberately bypass Laravel Prompts' multiselect here because its
+     * alt-screen rendering is unreliable on Windows cmd / Laragon / some WSL
+     * emulators (renders invisibly, silently eats keystrokes). A manual
+     * numbered list + comma-separated input works on every terminal.
+     *
+     * @return array<int, string>
+     */
+    protected function pickModulesManually(ModuleRegistry $registry): array
+    {
+        $slugs = array_keys($registry->all());
+
+        $this->line('');
+        $this->line('<fg=cyan>Optional modules:</>');
+        foreach ($slugs as $i => $slug) {
+            $meta = $registry->get($slug);
+            $this->line(sprintf('  <fg=yellow>%2d</>. <info>%s</info> — %s', $i + 1, $slug, $meta['summary']));
+        }
+        $this->line('');
+        $this->line('Type comma-separated numbers to install (e.g. <info>1,3,5</info>), <info>all</info> for everything, or press <info>Enter</info> to install core only.');
+        $this->output->write('> ');
+
+        $line = fgets(STDIN);
+
+        if ($line === false) {
+            return [];
         }
 
-        return multiselect(
-            label: 'Select optional modules to install',
-            options: $options,
-            hint: 'Space to toggle, Enter to confirm. You can install more later with ui-kit:install-module.'
-        );
+        $input = trim($line);
+
+        if ($input === '') {
+            return [];
+        }
+
+        if (strtolower($input) === 'all') {
+            return $slugs;
+        }
+
+        $selected = [];
+        foreach (array_filter(array_map('trim', explode(',', $input))) as $pick) {
+            if (! ctype_digit($pick)) {
+                $this->warn("Ignoring invalid entry: {$pick}");
+
+                continue;
+            }
+
+            $idx = (int) $pick - 1;
+
+            if (! isset($slugs[$idx])) {
+                $this->warn("Ignoring out-of-range number: {$pick}");
+
+                continue;
+            }
+
+            if (! in_array($slugs[$idx], $selected, true)) {
+                $selected[] = $slugs[$idx];
+            }
+        }
+
+        return $selected;
     }
 }
