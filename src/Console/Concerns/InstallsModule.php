@@ -3,6 +3,7 @@
 namespace Shipbytes\UiKit\Console\Concerns;
 
 use Illuminate\Filesystem\Filesystem;
+use Laravel\Prompts\Prompt;
 
 trait InstallsModule
 {
@@ -11,6 +12,35 @@ trait InstallsModule
         $base = realpath(__DIR__.'/../../../stubs');
 
         return $relative === '' ? $base : $base.DIRECTORY_SEPARATOR.ltrim($relative, '/\\');
+    }
+
+    /**
+     * Force Laravel Prompts into Symfony-Console fallback mode on terminals
+     * where its alt-screen rendering doesn't reliably work (Windows cmd,
+     * WSL with some emulators). Overridable via UI_KIT_PROMPTS_FALLBACK=0|1.
+     */
+    protected function ensurePromptsRender(): void
+    {
+        $override = getenv('UI_KIT_PROMPTS_FALLBACK');
+
+        if ($override === '0' || $override === 'false') {
+            Prompt::fallbackWhen(false);
+
+            return;
+        }
+
+        if ($override === '1' || $override === 'true') {
+            Prompt::fallbackWhen(true);
+
+            return;
+        }
+
+        $shouldFallback = PHP_OS_FAMILY === 'Windows'
+            || getenv('WSL_DISTRO_NAME') !== false
+            || getenv('WSL_INTEROP') !== false
+            || ! stream_isatty(STDIN);
+
+        Prompt::fallbackWhen($shouldFallback);
     }
 
     /**

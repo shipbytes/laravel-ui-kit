@@ -8,6 +8,7 @@ use Shipbytes\UiKit\Console\ListModulesCommand;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
 use Shipbytes\UiKit\Support\ModuleRegistry;
 use Shipbytes\UiKit\Support\NullBadgeResolver;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Volt\Volt;
 
@@ -35,7 +36,28 @@ class UiKitServiceProvider extends ServiceProvider
             $this->registerPublishers();
         }
 
+        $this->registerRoutes();
         $this->registerVoltMountPaths();
+    }
+
+    /**
+     * Load the kit's published route files automatically so host apps don't
+     * need to edit bootstrap/app.php. If a consumer wants to disable this
+     * (e.g. to fully customize routing), just delete routes/auth.php or
+     * routes/admin.php — the provider no-ops when they aren't present.
+     */
+    protected function registerRoutes(): void
+    {
+        $authRoutes = base_path('routes/auth.php');
+        $adminRoutes = base_path('routes/admin.php');
+
+        if (file_exists($authRoutes)) {
+            Route::middleware('web')->group($authRoutes);
+        }
+
+        if (file_exists($adminRoutes)) {
+            Route::middleware('web')->group($adminRoutes);
+        }
     }
 
     protected function registerPublishers(): void

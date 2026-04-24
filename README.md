@@ -127,7 +127,7 @@ composer update shipbytes/laravel-ui-kit
 
 ### Finish wiring
 
-Five steps. You'll do these once per project.
+The installer does the heavy lifting (publishes files, patches `config/fortify.php`, auto-loads the kit's routes from the service provider). You still need:
 
 1. **Add the Tailwind preset** so your utility classes include the brand palette and dark-mode strategy.
    ```js
@@ -150,20 +150,20 @@ Five steps. You'll do these once per project.
    /* resources/css/app.css */
    @import './ui-kit.css';
    ```
-3. **Load the admin and auth routes.** Add to `bootstrap/app.php` (L11+) or `RouteServiceProvider` (L10):
-   ```php
-   Route::middleware('web')->group(base_path('routes/admin.php'));
-   Route::middleware('web')->group(base_path('routes/auth.php'));
-   ```
-4. **Run migrations and build assets.**
+3. **Run migrations and build assets.**
    ```bash
    php artisan migrate
    npm install
    npm run dev    # or: npm run build
    ```
-5. **Configure mail** (see [Mail (for auth emails)](#mail-for-auth-emails) below) so password-reset and email-verification links actually get delivered.
+4. **Configure mail** (see [Mail (for auth emails)](#mail-for-auth-emails) below) so password-reset and email-verification links actually get delivered.
 
 That's the whole happy path. You should be able to hit `/register`, `/login`, and `/admin` immediately.
+
+> **What the installer handles for you**
+> - Publishes `config/fortify.php` and flips `views` → `false`, so Fortify's default view routes don't collide with the kit's Volt pages. (Without this, `/register` 500s with "RegisterViewResponse is not instantiable".)
+> - Auto-loads `routes/auth.php` and `routes/admin.php` from the service provider. **No `bootstrap/app.php` edit required.** If you'd rather wire them yourself, just delete the published route files and register them your own way.
+> - If interactive prompts render blank on your terminal (Windows cmd, some WSL emulators), the installer falls back to Symfony Console's numbered-list prompts automatically. Override with `UI_KIT_PROMPTS_FALLBACK=0` (force fancy) or `=1` (force plain).
 
 ## Configuration
 

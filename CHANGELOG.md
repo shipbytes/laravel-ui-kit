@@ -6,14 +6,7 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
-### Added
-- **Preflight auth-scaffold detection** in `ui-kit:install` — aborts on
-  Jetstream, warns + confirms on Breeze or stray auth files (`routes/auth.php`,
-  `app/Livewire/Forms/LoginForm.php`, `resources/views/livewire/pages/auth/*`).
-  Non-interactive runs abort unless `--force` is passed, so CI can't silently
-  end up with a broken mixed setup.
-
-## [0.1.0] - 2026-04-23
+## [0.1.0] - 2026-04-24
 
 Initial public release.
 
@@ -40,12 +33,28 @@ Initial public release.
   - `dark-mode` — theme toggle component + no-flash snippet.
 - **Sidebar badge contract** (`SidebarBadgeResolver`) so host apps can bind
   their own count resolvers.
+- **Preflight auth-scaffold detection** in `ui-kit:install` — aborts on
+  Jetstream, warns + confirms on Breeze or stray auth files
+  (`routes/auth.php`, `app/Livewire/Forms/LoginForm.php`,
+  `resources/views/livewire/pages/auth/*`). Non-interactive runs abort
+  unless `--force` is passed.
+- **Auto-Fortify configuration** — the installer publishes `config/fortify.php`
+  (if absent) and flips `views` to `false`, so Fortify's default view routes
+  don't collide with the kit's Volt pages. Prevents a `/register` 500 with
+  "Target [Laravel\Fortify\Contracts\RegisterViewResponse] is not instantiable"
+  on fresh installs.
+- **Auto-loaded routes** — `UiKitServiceProvider` wires `routes/auth.php`
+  and `routes/admin.php` into the host app automatically when they exist.
+  Consumers don't need to edit `bootstrap/app.php`. Delete either published
+  route file to opt out.
+- **Prompts fallback** — the installer detects Windows cmd and WSL and
+  switches Laravel Prompts to its Symfony-Console fallback (numbered list
+  instead of alt-screen rendering) so multiselect pickers don't appear
+  invisible on terminals that mis-handle the fancy rendering. Override with
+  `UI_KIT_PROMPTS_FALLBACK=0|1`.
 - **CI matrix** covering PHP 8.1–8.4 × Laravel 10/11/12 with lint + phpunit.
 
 ### Known limitations
-- Users must manually load `routes/admin.php` and `routes/auth.php` in
-  `bootstrap/app.php` (L11+) or `RouteServiceProvider` (L10). The installer
-  prints the exact snippet but does not auto-patch.
 - Laravel 13 is not yet in CI — peer-dep readiness across Fortify / Spatie
   is still landing. The kit is expected to work on L13; bump `composer.json`
   locally to try.

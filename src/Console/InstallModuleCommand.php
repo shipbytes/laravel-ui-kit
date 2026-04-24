@@ -24,6 +24,8 @@ class InstallModuleCommand extends Command
 
     public function handle(ModuleRegistry $registry): int
     {
+        $this->ensurePromptsRender();
+
         $slug = (string) $this->argument('module');
 
         if (! $registry->has($slug)) {

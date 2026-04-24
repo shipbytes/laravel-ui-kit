@@ -27,6 +27,8 @@ class InstallCommand extends Command
 
     public function handle(ModuleRegistry $registry): int
     {
+        $this->ensurePromptsRender();
+
         info('UI Kit — core install');
 
         if (($abortCode = $this->preflightAuthConflicts()) !== null) {
@@ -36,6 +38,7 @@ class InstallCommand extends Command
         note("The following core pieces will be installed:\n  • Auth pages (login, register, verify, etc.)\n  • Admin shell (sidebar + mobile nav)\n  • Dashboard stub + Users CRUD");
 
         $this->publishCore();
+        $this->configureFortify();
 
         $selected = $this->resolveSelectedModules($registry);
 
@@ -62,6 +65,58 @@ class InstallCommand extends Command
             ]);
             $this->line("  ✓ published <info>{$tag}</info>");
         }
+    }
+
+    /**
+     * Publish Fortify's config and disable its default view routes.
+     *
+     * The kit ships its own Volt-based login/register/etc. routes (in
+     * routes/auth.php, auto-loaded by the service provider). If Fortify
+     * also registers its default view routes, they collide on the same
+     * paths and crash with "RegisterViewResponse is not instantiable"
+     * because Fortify's view responses aren't bound without a published
+     * FortifyServiceProvider.
+     *
+     * Flipping `views` to false tells Fortify to skip GET route
+     * registration, leaving the kit's routes unopposed. Fortify still
+     * registers its POST action routes (login/register/etc.) which the
+     * kit doesn't use directly either (Livewire handles the form POSTs),
+     * but those routes are harmless — they just sit there unused.
+     */
+    protected function configureFortify(): void
+    {
+        $path = config_path('fortify.php');
+
+        if (! file_exists($path)) {
+            Artisan::call('vendor:publish', [
+                '--provider' => 'Laravel\\Fortify\\FortifyServiceProvider',
+                '--tag' => 'fortify-config',
+            ]);
+            $this->line('  ✓ published <info>fortify-config</info>');
+        }
+
+        if (! file_exists($path)) {
+            warning('Could not publish config/fortify.php. Set `views => false` there manually to avoid a /register 500.');
+
+            return;
+        }
+
+        $contents = file_get_contents($path);
+
+        if (str_contains($contents, "'views' => true")) {
+            file_put_contents($path, str_replace("'views' => true", "'views' => false", $contents));
+            $this->line('  ✓ patched <info>fortify.php</info> <comment>views=false</comment> (kit supplies its own auth routes)');
+
+            return;
+        }
+
+        if (str_contains($contents, "'views' => false")) {
+            $this->line('  ✓ <info>fortify.php</info> already has views=false');
+
+            return;
+        }
+
+        warning("Couldn't find a `views` flag in config/fortify.php. Set it to false manually so Fortify doesn't collide with the kit's auth routes.");
     }
 
     /**
