@@ -64,17 +64,143 @@ class InstallModuleCommand extends Command
             }
         }
 
+        // Apply auto-patches and defer artisan/npm commands declared in metadata.
+        $this->applyModuleAutomation($slug, $meta, $providers);
+
+        // When called standalone (not from the parent installer), drain deferred
+        // commands now. The parent runs them after all modules finish.
+        if (! $this->option('from-parent')) {
+            $this->newLine();
+            $this->line('<comment>Running tail commands…</comment>');
+            $this->runDeferredCommands();
+
+            // Regenerate UiKitUser trait based on the now-current installed set.
+            // (Parent installer regenerates once at the end of all modules.)
+            if (in_array($slug, ['admin-middleware', 'impersonation'], true)) {
+                $this->generateUiKitUserTrait();
+            }
+        }
+
         $this->info("Module <comment>{$slug}</comment> installed.");
 
-        if (! empty($meta['post_install_notes'])) {
-            $this->newLine();
-            $this->line('<comment>Next steps:</comment>');
-            foreach ($meta['post_install_notes'] as $i => $note) {
-                $this->line('  '.($i + 1).'. '.$note);
+        // Suppress per-module manual notes when invoked by the parent installer
+        // — InstallCommand prints one consolidated final summary covering all
+        // selected modules. When run standalone, surface them here.
+        if (! $this->option('from-parent')) {
+            $manualNotes = $this->collectManualNotes($meta, $providers);
+
+            if (! empty($manualNotes)) {
+                $this->newLine();
+                $this->line('<comment>Manual steps still needed:</comment>');
+                foreach ($manualNotes as $i => $note) {
+                    $this->line('  '.($i + 1).'. '.$note);
+                }
             }
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Read the module's structured metadata and apply patches / queue commands.
+     *
+     * @param  array<string, mixed>  $meta
+     * @param  array<int, string>  $providers
+     */
+    protected function applyModuleAutomation(string $slug, array $meta, array $providers): void
+    {
+        // Module-level fields (apply unconditionally)
+        if (! empty($meta['admin_middleware_swap'])) {
+            $this->patchAdminMiddleware();
+        }
+
+        if (! empty($meta['admin_routes'])) {
+            $this->patchAdminRoutes($meta['admin_routes']);
+        }
+
+        if (! empty($meta['admin_nav'])) {
+            $this->patchAdminNav($meta['admin_nav']);
+        }
+
+        if (! empty($meta['user_routes'])) {
+            $this->patchUserRoutes($meta['user_routes']);
+        }
+
+        if (! empty($meta['artisan_publish'])) {
+            foreach ($meta['artisan_publish'] as $args) {
+                $this->deferVendorPublish($args);
+            }
+        }
+
+        if (! empty($meta['artisan_seed'])) {
+            foreach ((array) $meta['artisan_seed'] as $class) {
+                $this->deferSeeder($class);
+            }
+        }
+
+        if (! empty($meta['storage_link'])) {
+            $this->deferStorageLink();
+        }
+
+        if (! empty($meta['npm'])) {
+            $this->deferNpmInstall((array) $meta['npm']);
+        }
+
+        // Anything that copies a migration also implies "we need to migrate".
+        // Cheap heuristic: if the module's stub dir contains a migrations folder,
+        // schedule a migrate. Same for any artisan_publish that exists.
+        $stubMigrations = $this->stubsPath("modules/{$slug}/migrations");
+        if (is_dir($stubMigrations) || ! empty($meta['artisan_publish'])) {
+            $this->deferMigrate();
+        }
+
+        // Per-provider metadata (only for picked providers).
+        $perProvider = $meta['providers_meta'] ?? [];
+        foreach ($providers as $provider) {
+            $pMeta = $perProvider[$provider] ?? [];
+
+            if (! empty($pMeta['admin_routes'])) {
+                $this->patchAdminRoutes($pMeta['admin_routes']);
+            }
+            if (! empty($pMeta['admin_nav'])) {
+                $this->patchAdminNav($pMeta['admin_nav']);
+            }
+            if (! empty($pMeta['user_routes'])) {
+                $this->patchUserRoutes($pMeta['user_routes']);
+            }
+            if (! empty($pMeta['npm'])) {
+                $this->deferNpmInstall((array) $pMeta['npm']);
+            }
+            if (! empty($pMeta['artisan_publish'])) {
+                foreach ($pMeta['artisan_publish'] as $args) {
+                    $this->deferVendorPublish($args);
+                }
+            }
+
+            // Provider stubs may also include migrations (e.g. analytics:utm).
+            $providerMigrations = $this->stubsPath("modules/{$slug}/providers/{$provider}/migrations");
+            if (is_dir($providerMigrations)) {
+                $this->deferMigrate();
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @param  array<int, string>  $providers
+     * @return array<int, string>
+     */
+    protected function collectManualNotes(array $meta, array $providers): array
+    {
+        $notes = (array) ($meta['post_install_notes'] ?? []);
+
+        $perProvider = $meta['providers_meta'] ?? [];
+        foreach ($providers as $provider) {
+            $pNotes = (array) ($perProvider[$provider]['post_install_notes'] ?? []);
+            $notes = array_merge($notes, $pNotes);
+        }
+
+        return array_values(array_unique($notes));
     }
 
     /**
@@ -108,10 +234,6 @@ class InstallModuleCommand extends Command
     }
 
     /**
-     * Plain STDIN-based picker. Mirrors InstallCommand::pickModulesManually()
-     * so we avoid Laravel Prompts' multiselect on terminals where it renders
-     * invisibly (Windows cmd, some WSL emulators).
-     *
      * @param  array<string, mixed>  $meta
      * @return array<int, string>
      */

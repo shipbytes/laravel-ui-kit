@@ -8,6 +8,9 @@ use Shipbytes\UiKit\Console\ListModulesCommand;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
 use Shipbytes\UiKit\Support\ModuleRegistry;
 use Shipbytes\UiKit\Support\NullBadgeResolver;
+use Shipbytes\UiKit\View\Components\UiKitBanners;
+use Shipbytes\UiKit\View\Components\UiKitHead;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Volt\Volt;
@@ -20,11 +23,16 @@ class UiKitServiceProvider extends ServiceProvider
 
         $this->app->singleton(ModuleRegistry::class);
         $this->app->bind(SidebarBadgeResolver::class, NullBadgeResolver::class);
+
+        $this->seedAnalyticsConfigDefaults();
     }
 
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../stubs/core/views', 'ui-kit');
+
+        Blade::component('ui-kit::head', UiKitHead::class);
+        Blade::component('ui-kit::banners', UiKitBanners::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -37,27 +45,76 @@ class UiKitServiceProvider extends ServiceProvider
         }
 
         $this->registerRoutes();
+        $this->registerUtmMiddleware();
         $this->registerVoltMountPaths();
+    }
+
+    /**
+     * Read GA4 / PostHog values from .env and inject them into config/services
+     * at runtime, so consumers don't have to edit config/services.php.
+     *
+     * If a consumer has set the keys explicitly in services.php, those win —
+     * we only fill in when the slot is empty.
+     */
+    protected function seedAnalyticsConfigDefaults(): void
+    {
+        $current = $this->app['config']->get('services', []);
+
+        $current['google'] ??= [];
+        $current['google']['analytics_id'] = $current['google']['analytics_id']
+            ?? env('GOOGLE_ANALYTICS_ID');
+
+        $current['posthog'] ??= [];
+        $current['posthog']['public_key'] = $current['posthog']['public_key']
+            ?? env('POSTHOG_PUBLIC_KEY');
+        $current['posthog']['host'] = $current['posthog']['host']
+            ?? env('POSTHOG_HOST', 'https://us.i.posthog.com');
+
+        $this->app['config']->set('services', $current);
     }
 
     /**
      * Load the kit's published route files automatically so host apps don't
      * need to edit bootstrap/app.php. If a consumer wants to disable this
-     * (e.g. to fully customize routing), just delete routes/auth.php or
-     * routes/admin.php — the provider no-ops when they aren't present.
+     * (e.g. to fully customize routing), just delete the relevant route file —
+     * the provider no-ops when they aren't present.
      */
     protected function registerRoutes(): void
     {
-        $authRoutes = base_path('routes/auth.php');
-        $adminRoutes = base_path('routes/admin.php');
+        $files = [
+            base_path('routes/auth.php'),
+            base_path('routes/admin.php'),
+            base_path('routes/ui-kit-user.php'),
+        ];
 
-        if (file_exists($authRoutes)) {
-            Route::middleware('web')->group($authRoutes);
+        foreach ($files as $file) {
+            if (file_exists($file)) {
+                Route::middleware('web')->group($file);
+            }
+        }
+    }
+
+    /**
+     * If the analytics:utm provider was installed, push the kit's
+     * CaptureUtmParameters middleware into the web group at runtime.
+     * Removes the manual bootstrap/app.php edit step.
+     */
+    protected function registerUtmMiddleware(): void
+    {
+        $installed = config('ui-kit.installed_modules', []);
+        $utmInstalled = in_array('utm', $installed['analytics'] ?? [], true);
+
+        if (! $utmInstalled) {
+            return;
         }
 
-        if (file_exists($adminRoutes)) {
-            Route::middleware('web')->group($adminRoutes);
+        $class = '\\App\\Http\\Middleware\\CaptureUtmParameters';
+
+        if (! class_exists($class)) {
+            return;
         }
+
+        Route::pushMiddlewareToGroup('web', $class);
     }
 
     protected function registerPublishers(): void
@@ -85,6 +142,7 @@ class UiKitServiceProvider extends ServiceProvider
         $this->publishes([
             $core.'/routes/auth.php' => base_path('routes/auth.php'),
             $core.'/routes/admin.php' => base_path('routes/admin.php'),
+            $core.'/routes/ui-kit-user.php' => base_path('routes/ui-kit-user.php'),
         ], 'ui-kit-routes');
 
         $this->publishes([

@@ -12,4 +12,6 @@ Route::prefix(config('admin.route_prefix'))
         Route::get('/', Dashboard::class)->name('dashboard');
         Route::get('/users', UserList::class)->name('users.index');
         Route::get('/users/{user}', UserDetail::class)->name('users.show');
+        /* ui-kit:admin-routes-start */
+        /* ui-kit:admin-routes-end */
     });

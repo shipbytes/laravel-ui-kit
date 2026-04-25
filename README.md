@@ -127,9 +127,32 @@ composer update shipbytes/laravel-ui-kit
 
 ### Finish wiring
 
-The installer does the heavy lifting (publishes files, patches `config/fortify.php`, auto-loads the kit's routes from the service provider). You still need:
+The installer does almost everything — publishes assets/configs/migrations, patches `config/fortify.php` and `config/admin.php` (middleware + nav), appends module routes, runs `vendor:publish` for every dependent package, runs one `php artisan migrate`, seeds the admin role, runs `storage:link`, installs npm packages where required, and generates `app/Models/Concerns/UiKitUser.php` based on which modules you picked.
 
-1. **Add the Tailwind preset** so your utility classes include the brand palette and dark-mode strategy.
+That leaves a small irreducible checklist you do **once**:
+
+1. **Add the kit's User trait** (only if you picked `admin-middleware` or `impersonation`):
+   ```php
+   // app/Models/User.php
+   use App\Models\Concerns\UiKitUser;
+
+   class User extends Authenticatable
+   {
+       use UiKitUser;   // <-- add this line
+       // ... your existing traits
+   }
+   ```
+2. **Add the kit's component tags to your master layout** (`resources/views/layouts/app.blade.php`):
+   ```blade
+   <head>
+       <x-ui-kit::head />        {{-- analytics + dark-mode no-flash --}}
+   </head>
+   <body>
+       <x-ui-kit::banners />     {{-- impersonation ribbon (auto-hides) --}}
+       {{ $slot ?? '' }}
+   </body>
+   ```
+3. **Add the Tailwind preset and import the kit's JS/CSS into your Vite bundles:**
    ```js
    // tailwind.config.js
    module.exports = {
@@ -141,7 +164,6 @@ The installer does the heavy lifting (publishes files, patches `config/fortify.p
        ],
    };
    ```
-2. **Import Alpine stores + CSS** into your existing Vite bundles.
    ```js
    // resources/js/app.js
    import './ui-kit';
@@ -150,20 +172,34 @@ The installer does the heavy lifting (publishes files, patches `config/fortify.p
    /* resources/css/app.css */
    @import './ui-kit.css';
    ```
-3. **Run migrations and build assets.**
-   ```bash
-   php artisan migrate
-   npm install
-   npm run dev    # or: npm run build
+4. **Set required `.env` keys:**
+   ```dotenv
+   MAIL_MAILER=log                # use 'smtp'/'mailgun'/etc. for production
+   MAIL_FROM_ADDRESS="noreply@example.com"
+   MAIL_FROM_NAME="${APP_NAME}"
+
+   GOOGLE_ANALYTICS_ID=           # optional: only if you picked analytics:ga4
+   POSTHOG_PUBLIC_KEY=             # optional: only if you picked analytics:posthog
    ```
-4. **Configure mail** (see [Mail (for auth emails)](#mail-for-auth-emails) below) so password-reset and email-verification links actually get delivered.
+5. **Build assets, then make a user admin:**
+   ```bash
+   npm install && npm run dev
 
-That's the whole happy path. You should be able to hit `/register`, `/login`, and `/admin` immediately.
+   # Promote your test account to admin (only if admin-middleware is installed)
+   php artisan tinker --execute="App\Models\User::find(1)->assignRole('admin');"
+   ```
 
-> **What the installer handles for you**
-> - Publishes `config/fortify.php` and flips `views` → `false`, so Fortify's default view routes don't collide with the kit's Volt pages. (Without this, `/register` 500s with "RegisterViewResponse is not instantiable".)
-> - Auto-loads `routes/auth.php` and `routes/admin.php` from the service provider. **No `bootstrap/app.php` edit required.** If you'd rather wire them yourself, just delete the published route files and register them your own way.
-> - If interactive prompts render blank on your terminal (Windows cmd, some WSL emulators), the installer falls back to Symfony Console's numbered-list prompts automatically. Override with `UI_KIT_PROMPTS_FALLBACK=0` (force fancy) or `=1` (force plain).
+That's it. `/register`, `/login`, `/admin`, `/profile`, and every module's admin page should work.
+
+> **What the installer handled for you**
+> - Published every kit + dependency config (Fortify, Spatie Permission, mews/purifier, lab404/impersonate, Spatie Activitylog).
+> - Patched `config/fortify.php` (`views=false`), `config/admin.php` (middleware swap + nav entries between `/* ui-kit:nav-* */` markers), and `routes/admin.php` (module routes between `/* ui-kit:admin-routes-* */` markers).
+> - Auto-loads `routes/auth.php`, `routes/admin.php`, and `routes/ui-kit-user.php` from the service provider — no `bootstrap/app.php` edit required.
+> - Pushed the UTM-capture middleware into the `web` group at runtime (when `analytics:utm` is installed), so you don't have to register it manually.
+> - Reads `GOOGLE_ANALYTICS_ID` / `POSTHOG_PUBLIC_KEY` / `POSTHOG_HOST` directly from `.env` into `services.google.*` and `services.posthog.*` at boot — no `config/services.php` edit needed.
+> - Generated `app/Models/Concerns/UiKitUser.php` bundling whatever traits and methods your installed modules require.
+> - All patches are **idempotent** — re-running `ui-kit:install` (or installing more modules later) won't duplicate nav entries or routes.
+> - On Windows cmd / Laragon / some WSL emulators, the picker uses a plain numbered-list prompt instead of Laravel Prompts' alt-screen rendering. Override with `UI_KIT_PROMPTS_FALLBACK=0` (force fancy) or `=1` (force plain).
 
 ## Configuration
 
@@ -344,7 +380,7 @@ php artisan ui-kit:list-modules
 ## Module deep-dives
 
 ### `admin-middleware`
-Ships `EnsureUserIsAdmin` (Spatie role check) + `IsAdminUser` trait + `AdminRoleSeeder`. After install: publish Spatie config/migrations, migrate, seed the `admin` role, assign it to a user, and swap the middleware binding in `config/admin.php` from the fallback to `App\Http\Middleware\EnsureUserIsAdmin::class`.
+Ships `EnsureUserIsAdmin` (Spatie role check) + `AdminRoleSeeder`. The installer publishes Spatie's config/migrations, runs `migrate` and `db:seed --class=AdminRoleSeeder`, swaps the middleware in `config/admin.php` from the fallback to `App\Http\Middleware\EnsureUserIsAdmin::class`, and generates `App\Models\Concerns\UiKitUser` bundling Spatie's `HasRoles` trait. You add `use UiKitUser;` to your User model and `assignRole('admin')` to one user.
 
 ### `support-tickets`
 Admin-only queue (public form is yours to build). Search by name/email, filter by status/priority, inline replies. Mailables are intentionally omitted so you plug in your own notification flow.

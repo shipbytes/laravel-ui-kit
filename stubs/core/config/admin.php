@@ -38,5 +38,7 @@ return [
     'nav' => [
         ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'grid'],
         ['label' => 'Users', 'route' => 'admin.users.index', 'icon' => 'users'],
+        /* ui-kit:nav-start */
+        /* ui-kit:nav-end */
     ],
 ];

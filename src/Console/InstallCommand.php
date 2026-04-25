@@ -27,6 +27,7 @@ class InstallCommand extends Command
     public function handle(ModuleRegistry $registry): int
     {
         $this->ensurePromptsRender();
+        $this->resetDeferred();
 
         info('UI Kit — core install');
 
@@ -39,18 +40,121 @@ class InstallCommand extends Command
         $this->publishCore();
         $this->configureFortify();
 
+        // The kit ships at least one core migration (add_is_admin_to_users_table).
+        $this->deferMigrate();
+
         $selected = $this->resolveSelectedModules($registry);
 
         foreach ($selected as $slug) {
-            $this->call('ui-kit:install-module', [
+            $args = [
                 'module' => $slug,
                 '--from-parent' => true,
-            ]);
+            ];
+
+            // Pass through provider selection for analytics so non-interactive
+            // installs work without a second prompt.
+            if ($slug === 'analytics' && $this->option('modules') !== null) {
+                // Default to all providers when invoking non-interactively with
+                // --modules=all etc. Users can still pin specific ones via
+                // --providers when running ui-kit:install-module directly.
+                $args['--providers'] = 'utm,ga4,posthog';
+            }
+
+            $this->call('ui-kit:install-module', $args);
         }
 
-        note("Next steps:\n  1. php artisan migrate\n  2. npm install && npm run dev\n  3. Add `require('shipbytes/laravel-ui-kit/tailwind-preset')` to tailwind.config.js");
+        $this->newLine();
+        $this->line('<comment>Running tail commands…</comment>');
+        $this->runDeferredCommands();
+        $this->generateUiKitUserTrait();
+
+        $this->printFinalSummary($registry, $selected);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Print a single consolidated checklist of the irreducibly-manual steps.
+     *
+     * @param  array<int, string>  $selected
+     */
+    protected function printFinalSummary(ModuleRegistry $registry, array $selected): void
+    {
+        $this->newLine();
+        $this->line('<fg=green>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</>');
+        $this->line('<fg=green>UI Kit installed.</> A few small things still need your hand:');
+        $this->line('<fg=green>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</>');
+        $this->newLine();
+
+        $needsUserTrait = in_array('admin-middleware', $selected, true)
+            || in_array('impersonation', $selected, true);
+
+        $step = 1;
+
+        if ($needsUserTrait) {
+            $this->line("  <fg=yellow>{$step}.</> Add the kit's User trait to <info>app/Models/User.php</info>:");
+            $this->line('       <fg=gray>use App\\Models\\Concerns\\UiKitUser;</>');
+            $this->line('       <fg=gray>class User extends Authenticatable {</>');
+            $this->line('       <fg=gray>    use UiKitUser;  // <-- add</>');
+            $this->line('       <fg=gray>}</>');
+            $this->newLine();
+            $step++;
+        }
+
+        $this->line("  <fg=yellow>{$step}.</> Add the kit's component tags to your master layout (<info>resources/views/layouts/app.blade.php</info>):");
+        $this->line('       <fg=gray>&lt;head&gt;</>');
+        $this->line('       <fg=gray>    &lt;x-ui-kit::head /&gt;       <!-- analytics + dark-mode no-flash --&gt;</>');
+        $this->line('       <fg=gray>&lt;/head&gt;</>');
+        $this->line('       <fg=gray>&lt;body&gt;</>');
+        $this->line('       <fg=gray>    &lt;x-ui-kit::banners /&gt;    <!-- impersonation ribbon --&gt;</>');
+        $this->line('       <fg=gray>&lt;/body&gt;</>');
+        $this->newLine();
+        $step++;
+
+        $this->line("  <fg=yellow>{$step}.</> Set <info>.env</info> keys for the features you enabled:");
+        $this->line('       <fg=gray>MAIL_*</>           required for password reset / verification');
+        if (in_array('analytics', $selected, true)) {
+            $this->line('       <fg=gray>GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX</>   (analytics:ga4)');
+            $this->line('       <fg=gray>POSTHOG_PUBLIC_KEY=phc_…</>            (analytics:posthog)');
+        }
+        $this->newLine();
+        $step++;
+
+        $this->line("  <fg=yellow>{$step}.</> Build assets:");
+        $this->line('       <fg=gray>npm install &amp;&amp; npm run dev</>');
+        $this->newLine();
+        $step++;
+
+        if (in_array('admin-middleware', $selected, true)) {
+            $this->line("  <fg=yellow>{$step}.</> Make a user admin:");
+            $this->line('       <fg=gray>php artisan tinker --execute="App\\\\Models\\\\User::find(1)-&gt;assignRole(\'admin\');"</>');
+            $this->newLine();
+            $step++;
+        }
+
+        // Show any module-specific residual notes.
+        $residual = [];
+        foreach ($selected as $slug) {
+            $meta = $registry->get($slug);
+            foreach ((array) ($meta['post_install_notes'] ?? []) as $note) {
+                $residual[] = "<fg=gray>[{$slug}]</> {$note}";
+            }
+            foreach ((array) ($meta['providers_meta'] ?? []) as $provider => $pMeta) {
+                foreach ((array) ($pMeta['post_install_notes'] ?? []) as $note) {
+                    $residual[] = "<fg=gray>[{$slug}:{$provider}]</> {$note}";
+                }
+            }
+        }
+
+        if (! empty($residual)) {
+            $this->line('  <fg=cyan>Optional / module-specific:</>');
+            foreach ($residual as $note) {
+                $this->line('       • '.$note);
+            }
+            $this->newLine();
+        }
+
+        $this->line('<fg=gray>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</>');
     }
 
     protected function publishCore(): void

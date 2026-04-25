@@ -6,13 +6,71 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-24
+
+Turnkey installer pass. The post-install checklist drops from ~30 manual
+steps across 9 files to **5 small steps** in 2 files (User model + master
+layout) plus an `.env` and an `assignRole`. Everything else is automated.
+
+### Added
+- **Auto-patching of `config/admin.php`** between `/* ui-kit:nav-start */`
+  and `/* ui-kit:nav-end */` markers — modules' nav entries are merged in
+  idempotently (dedup by route name).
+- **Auto-patching of `routes/admin.php`** between `/* ui-kit:admin-routes-*
+  */` markers — modules' admin routes are appended idempotently.
+- **`admin-middleware` swaps the middleware** in `config/admin.php`
+  automatically when installed.
+- **New `routes/ui-kit-user.php`** auto-loaded by the service provider.
+  Houses authenticated user-side routes (e.g. `/profile`). No need to
+  edit `routes/web.php`.
+- **Generated `App\Models\Concerns\UiKitUser` trait** that bundles
+  Spatie `HasRoles` + lab404 `Impersonate` + `canImpersonate` /
+  `canBeImpersonated` based on which modules you actually installed.
+  You add `use UiKitUser;` to your User model — one line instead of
+  two traits + two methods.
+- **`<x-ui-kit::head />`** Blade component bundling dark-mode no-flash
+  + GA4 + PostHog `@includes`. One tag in your `<head>`.
+- **`<x-ui-kit::banners />`** Blade component for the impersonation
+  ribbon (and any future kit-shipped banners).
+- **Auto-installed dependencies** via `vendor:publish` for every kit
+  module that needs it: Spatie Permission, mews/purifier,
+  lab404/laravel-impersonate, Spatie Activitylog. Plus
+  `php artisan storage:link` for the profile module and
+  `npm install posthog-js` for the analytics:posthog provider.
+- **Auto-runs** `php artisan migrate` (one shot, covering kit + module
+  + Spatie published migrations) and `db:seed AdminRoleSeeder` once
+  at the end of install.
+- **Runtime `services.php` config** — `UiKitServiceProvider` reads
+  `GOOGLE_ANALYTICS_ID` / `POSTHOG_PUBLIC_KEY` / `POSTHOG_HOST` from
+  `.env` and seeds `services.google.*` + `services.posthog.*` at
+  boot. No more editing `config/services.php`.
+- **Runtime UTM middleware registration** — when `analytics:utm` is
+  installed, the SP pushes `CaptureUtmParameters` to the `web` middleware
+  group automatically. No `bootstrap/app.php` edit.
+- **Idempotency tests** under `tests/Feature/PatchingIdempotencyTest.php`
+  asserting nav / admin-routes / user-routes / middleware-swap don't
+  duplicate on re-run.
+
 ### Changed
-- **Module + provider pickers now use plain STDIN** instead of Laravel Prompts'
-  multiselect. The Prompts fallback wasn't reliable on Windows cmd / Laragon
-  (rendered invisibly even with `fallbackWhen(true)`), so we took it out of the
-  critical path entirely. You now get a numbered list and type comma-separated
-  numbers (or `all`). Works on every terminal. `UI_KIT_PROMPTS_FALLBACK` still
-  controls the other Prompts calls (`confirm`, `info`, `note`).
+- `ModuleRegistry` modules now declare structured fields (`admin_routes`,
+  `admin_nav`, `user_routes`, `admin_middleware_swap`, `artisan_publish`,
+  `artisan_seed`, `storage_link`, `npm`, plus per-provider `providers_meta`)
+  instead of free-text post-install notes for everything. Residual
+  `post_install_notes` remain for genuinely-manual steps (e.g. assigning
+  the admin role).
+- Final installer output is now one consolidated summary instead of a
+  per-module checklist dump. Suppressed when `--from-parent` runs the
+  module command on behalf of `ui-kit:install`.
+- Module + provider pickers use plain STDIN (numbered list +
+  comma-separated input) instead of Laravel Prompts' multiselect, which
+  rendered invisibly on Windows cmd / Laragon.
+
+### Removed
+- The `IsAdminUser` stub trait at
+  `stubs/modules/admin-middleware/Models/Concerns/IsAdminUser.php`.
+  Replaced by the dynamically-generated `UiKitUser` trait. **Breaking
+  change** for anyone who installed v0.1.0 days ago — re-import as
+  `App\Models\Concerns\UiKitUser`.
 
 ## [0.1.0] - 2026-04-24
 
@@ -67,5 +125,6 @@ Initial public release.
   is still landing. The kit is expected to work on L13; bump `composer.json`
   locally to try.
 
-[Unreleased]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/shipbytes/laravel-ui-kit/releases/tag/v0.1.0
