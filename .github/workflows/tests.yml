@@ -156,7 +156,7 @@ jobs:
         run: |
           php artisan tinker --execute="App\Models\User::forceCreate(['name' => 'CI Admin', 'email' => 'ci@example.com', 'password' => bcrypt('secret-ci-pass')]);"
           php artisan ui-kit:make-admin ci@example.com
-          php artisan tinker --execute="exit(App\Models\User::first()->hasRole('admin') && App\Models\User::first()->is_admin ? 0 : 1);"
+          php artisan tinker --execute="var_export(App\Models\User::first()->hasRole('admin') && (bool) App\Models\User::first()->is_admin);" | grep -q true
 
       - name: HTTP smoke
         working-directory: app
