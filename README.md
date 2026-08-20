@@ -136,25 +136,13 @@ composer update shipbytes/laravel-ui-kit
 - Patches `config/admin.php` nav and `routes/admin.php` / `routes/ui-kit-user.php` between `/* ui-kit:* */` markers — **idempotently**, and without wiping other modules' entries
 - **Wires your Vite entrypoints**: adds `@import './ui-kit.css';` to `resources/css/app.css` and `import './ui-kit';` to `resources/js/app.js`
 - Runs `vendor:publish` for every dependent package, one `php artisan migrate`, seeds the admin role, runs `storage:link`
-- Generates `app/Models/Concerns/UiKitUser.php` bundling exactly the traits your chosen modules need (Spatie `HasRoles`, lab404 `Impersonate`, Fortify `TwoFactorAuthenticatable`)
+- Generates `app/Models/Concerns/UiKitUser.php` bundling exactly the traits your chosen modules need (Spatie `HasRoles`, lab404 `Impersonate`, Fortify `TwoFactorAuthenticatable`) — **and applies it to `app/Models/User.php` automatically** (the patch is lint-checked and reverted if it would break the file; you only edit by hand if the installer says so)
 - Auto-loads `routes/auth.php`, `routes/admin.php`, `routes/ui-kit-user.php` from the service provider — no `bootstrap/app.php` edit
 - Registers sane `login` / `two-factor` rate limiters unless your app already defines them
 
 ### Finish wiring (the irreducible checklist)
 
-1. **Add the kit's User trait** (only if you picked `admin-middleware`, `impersonation`, or `profile`):
-
-   ```php
-   // app/Models/User.php
-   use App\Models\Concerns\UiKitUser;
-
-   class User extends Authenticatable
-   {
-       use UiKitUser;   // <-- add this line
-   }
-   ```
-
-2. **Set `.env` mail keys** (password reset / verification emails):
+1. **Set `.env` mail keys** (password reset / verification emails):
 
    ```dotenv
    MAIL_MAILER=log                # 'smtp'/'mailgun'/etc. for production
@@ -162,18 +150,22 @@ composer update shipbytes/laravel-ui-kit
    MAIL_FROM_NAME="${APP_NAME}"
    ```
 
-3. **Build assets, then make your first user admin:**
+2. **Build assets, then make your first user admin** (register through the UI first):
 
    ```bash
    npm install && npm run dev
-
-   # only if admin-middleware is installed:
-   php artisan tinker --execute="App\Models\User::find(1)->assignRole('admin');"
-   # without admin-middleware, set the is_admin flag instead:
-   php artisan tinker --execute="App\Models\User::find(1)->forceFill(['is_admin' => true])->save();"
+   php artisan ui-kit:make-admin you@example.com   # no email → promotes the first user
    ```
 
-4. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table of everything above (published files, Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
+   `ui-kit:make-admin` assigns the Spatie `admin` role when the
+   `admin-middleware` module is installed and sets the `is_admin` flag when the
+   column exists — whichever mechanisms are present.
+
+3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table (published files, Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
+
+> The `UiKitUser` trait used to be a manual step here — the installer now
+> applies it to `app/Models/User.php` itself and only asks you to do it by
+> hand if the patch fails (custom model location, unrecognized class layout).
 
 If your app has its own master layout for public pages, drop the kit's head/banner components into it so dark-mode no-flash and the impersonation ribbon work there too:
 
@@ -257,16 +249,20 @@ Without the `profile` module (or without the trait applied), login simply never 
 
 ```bash
 php artisan ui-kit:install-module support-tickets
+php artisan ui-kit:install-module changelog contacts profile     # several at once
+php artisan ui-kit:install-module changelog,contacts,profile     # commas work too
 php artisan ui-kit:list-modules
 php artisan ui-kit:doctor
 ```
+
+A batch is validated up front — one unknown slug aborts the whole run before anything is installed. When a batch includes `admin-middleware`, `impersonation`, or `profile`, the `UiKitUser` trait is regenerated **and re-applied to your User model automatically** at the end of the run. (`ui-kit:install-modules` works as an alias.)
 
 Re-running `ui-kit:install` is safe: it detects the existing install, keeps your files (pass `--force` to overwrite), and never duplicates nav entries, routes, or migrations.
 
 ## Module deep-dives
 
 ### `admin-middleware`
-Ships `EnsureUserIsAdmin` (Spatie role check) + `AdminRoleSeeder`. The installer publishes Spatie's config/migrations, migrates, seeds the `admin`/`user` roles, and swaps the middleware in `config/admin.php` from the `is_admin` fallback to the role check. You add `use UiKitUser;` and `assignRole('admin')` for your first admin.
+Ships `EnsureUserIsAdmin` (Spatie role check) + `AdminRoleSeeder`. The installer publishes Spatie's config/migrations, migrates, seeds the `admin`/`user` roles, and swaps the middleware in `config/admin.php` from the `is_admin` fallback to the role check. The `UiKitUser` trait (with `HasRoles`) is applied to your User model automatically; grant the role with `php artisan ui-kit:make-admin you@example.com`.
 
 ### `support-tickets`
 Admin-only queue (the public form is yours to build). Search by name/email, filter by status/priority/category, inline replies, open-count badge. Status/priority changes are validated server-side. Mailables are intentionally omitted so you plug in your own notification flow.

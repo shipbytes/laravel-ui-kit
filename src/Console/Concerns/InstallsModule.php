@@ -272,6 +272,67 @@ PHP;
         $this->line('  ✓ generated <info>app/Models/Concerns/UiKitUser.php</info>');
     }
 
+    /**
+     * Insert `use \App\Models\Concerns\UiKitUser;` into the app's User model
+     * so the generated trait is active without a manual edit. Returns true
+     * when the trait is (or already was) applied.
+     */
+    protected function applyUserTrait(): bool
+    {
+        if (! file_exists(app_path('Models/Concerns/UiKitUser.php'))) {
+            return true; // no trait generated → nothing to apply
+        }
+
+        $path = app_path('Models/User.php');
+        $manualHint = 'add `use \App\Models\Concerns\UiKitUser;` inside your User model class manually';
+
+        if (! file_exists($path)) {
+            $this->warn("  ! app/Models/User.php not found — {$manualHint}");
+
+            return false;
+        }
+
+        $contents = (string) file_get_contents($path);
+
+        if (str_contains($contents, 'UiKitUser')) {
+            $this->line('  ✓ UiKitUser trait already applied to <info>app/Models/User.php</info>');
+
+            return true;
+        }
+
+        $patched = preg_replace_callback(
+            '/class\s+User\b[^{]*\{/s',
+            fn (array $m): string => $m[0]."\n    use \\App\\Models\\Concerns\\UiKitUser;\n",
+            $contents,
+            1,
+            $count
+        );
+
+        if ($patched === null || $count !== 1) {
+            $this->warn("  ! could not locate the User class declaration — {$manualHint}");
+
+            return false;
+        }
+
+        file_put_contents($path, $patched);
+
+        // A User model we broke is far worse than a manual step — lint the
+        // result and revert on any parse failure.
+        $lint = new Process([PHP_BINARY, '-l', $path]);
+        $lint->run();
+
+        if (! $lint->isSuccessful()) {
+            file_put_contents($path, $contents);
+            $this->warn("  ! patching app/Models/User.php produced invalid PHP — reverted; {$manualHint}");
+
+            return false;
+        }
+
+        $this->line('  ✓ applied UiKitUser trait to <info>app/Models/User.php</info>');
+
+        return true;
+    }
+
     // -------------------------------------------------------------------
     // Host-file patching
     // -------------------------------------------------------------------

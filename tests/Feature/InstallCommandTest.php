@@ -5,6 +5,7 @@ namespace Shipbytes\UiKit\Tests\Feature;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\FortifyServiceProvider;
+use Shipbytes\UiKit\Tests\Fixtures\MakeAdminUser;
 use Shipbytes\UiKit\Tests\TestCase;
 
 /**
@@ -36,6 +37,25 @@ class InstallCommandTest extends TestCase
         (new Filesystem)->ensureDirectoryExists(resource_path('js'));
         file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n\n@source '../views';\n");
         file_put_contents(resource_path('js/app.js'), "import './bootstrap';\n");
+
+        // …and its User model (the skeleton ships none), so the installer's
+        // automatic trait application has a real file to patch.
+        (new Filesystem)->ensureDirectoryExists(app_path('Models'));
+        file_put_contents(app_path('Models/User.php'), <<<'PHP'
+<?php
+
+namespace App\Models;
+
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable
+{
+    use Notifiable;
+
+    protected $fillable = ['name', 'email', 'password'];
+}
+PHP);
     }
 
     protected function tearDown(): void
@@ -114,6 +134,13 @@ class InstallCommandTest extends TestCase
         $this->assertStringNotContainsString('HasRoles', $trait);
         $this->assertStringNotContainsString('Impersonate', $trait);
 
+        // …and the trait is wired into the User model automatically, with the
+        // result still being valid PHP.
+        $userModel = file_get_contents(app_path('Models/User.php'));
+        $this->assertStringContainsString('use \App\Models\Concerns\UiKitUser;', $userModel);
+        exec(PHP_BINARY.' -l '.escapeshellarg(app_path('Models/User.php')).' 2>&1', $lintOut, $lintCode);
+        $this->assertSame(0, $lintCode, implode("\n", $lintOut));
+
         // ---- Re-run: must succeed non-interactively (update mode) and stay idempotent.
         $this->artisan('ui-kit:install', ['--modules' => self::MODULES, '--no-interaction' => true])
             ->assertSuccessful();
@@ -130,6 +157,12 @@ class InstallCommandTest extends TestCase
 
         $this->assertSame(1, substr_count(file_get_contents(resource_path('css/app.css')), 'ui-kit.css'));
         $this->assertSame(1, substr_count(file_get_contents(resource_path('js/app.js')), "import './ui-kit';"));
+
+        $this->assertSame(
+            1,
+            substr_count(file_get_contents(app_path('Models/User.php')), 'UiKitUser'),
+            're-running the installer must not duplicate the User-model trait patch'
+        );
 
         $this->assertCount(
             1,
@@ -153,5 +186,71 @@ class InstallCommandTest extends TestCase
     {
         $this->artisan('ui-kit:install', ['--modules' => 'does-not-exist', '--no-interaction' => true])
             ->assertFailed();
+    }
+
+    public function test_install_module_accepts_multiple_and_comma_separated_slugs(): void
+    {
+        $this->loadLaravelMigrations();
+
+        $this->artisan('ui-kit:install', ['--modules' => 'support-tickets', '--no-interaction' => true])
+            ->assertSuccessful();
+
+        // One invocation, comma-separated — the shape users reach for first.
+        $this->artisan('ui-kit:install-module', ['modules' => ['contacts,profile'], '--no-interaction' => true])
+            ->assertSuccessful();
+
+        $uiKit = file_get_contents(config_path('ui-kit.php'));
+        $this->assertStringContainsString("'contacts',", $uiKit);
+        $this->assertStringContainsString("'profile',", $uiKit);
+
+        // profile in the batch → trait regenerated AND applied, standalone too.
+        $this->assertFileExists(app_path('Models/Concerns/UiKitUser.php'));
+        $this->assertStringContainsString(
+            'use \App\Models\Concerns\UiKitUser;',
+            file_get_contents(app_path('Models/User.php'))
+        );
+    }
+
+    public function test_install_module_rejects_batch_containing_unknown_slug(): void
+    {
+        $this->artisan('ui-kit:install-module', ['modules' => ['contacts', 'nope'], '--no-interaction' => true])
+            ->assertFailed();
+
+        $this->assertFileDoesNotExist(
+            config_path('ui-kit.php'),
+            'a batch with an unknown slug must install nothing'
+        );
+    }
+
+    public function test_make_admin_promotes_a_user(): void
+    {
+        $this->loadLaravelMigrations();
+
+        $this->artisan('ui-kit:install', ['--modules' => 'profile', '--no-interaction' => true])
+            ->assertSuccessful();
+
+        config(['auth.providers.users.model' => MakeAdminUser::class]);
+
+        MakeAdminUser::query()->create([
+            'name' => 'First', 'email' => 'first@example.com', 'password' => bcrypt('secret123'),
+        ]);
+        MakeAdminUser::query()->create([
+            'name' => 'Second', 'email' => 'second@example.com', 'password' => bcrypt('secret123'),
+        ]);
+
+        // By email.
+        $this->artisan('ui-kit:make-admin', ['email' => 'second@example.com'])->assertSuccessful();
+        $this->assertTrue(
+            (bool) MakeAdminUser::query()->where('email', 'second@example.com')->value('is_admin')
+        );
+
+        // No argument → first user.
+        $this->artisan('ui-kit:make-admin')->assertSuccessful();
+        $this->assertTrue(
+            (bool) MakeAdminUser::query()->where('email', 'first@example.com')->value('is_admin')
+        );
+
+        // Unknown email fails cleanly.
+        $this->artisan('ui-kit:make-admin', ['email' => 'ghost@example.com'])->assertFailed();
     }
 }

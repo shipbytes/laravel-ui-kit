@@ -14,6 +14,7 @@ use Shipbytes\UiKit\Console\DoctorCommand;
 use Shipbytes\UiKit\Console\InstallCommand;
 use Shipbytes\UiKit\Console\InstallModuleCommand;
 use Shipbytes\UiKit\Console\ListModulesCommand;
+use Shipbytes\UiKit\Console\MakeAdminCommand;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
 use Shipbytes\UiKit\Support\ModuleRegistry;
 use Shipbytes\UiKit\Support\NullBadgeResolver;
@@ -45,6 +46,7 @@ class UiKitServiceProvider extends ServiceProvider
                 InstallModuleCommand::class,
                 ListModulesCommand::class,
                 DoctorCommand::class,
+                MakeAdminCommand::class,
             ]);
 
             $this->registerPublishers();

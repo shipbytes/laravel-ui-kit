@@ -17,26 +17,94 @@ class InstallModuleCommand extends Command
     use InstallsModule;
 
     protected $signature = 'ui-kit:install-module
-                            {module : The module slug (e.g. support-tickets, changelog)}
+                            {modules* : One or more module slugs, space- or comma-separated (e.g. changelog contacts profile)}
                             {--force : Overwrite existing files without prompting}
                             {--from-parent : Internal flag set by ui-kit:install to suppress duplicate notices}';
 
-    protected $description = 'Install a single UI Kit module by slug.';
+    protected $description = 'Install one or more UI Kit modules by slug.';
+
+    protected $aliases = ['ui-kit:install-modules'];
 
     public function handle(ModuleRegistry $registry): int
     {
         $this->ensurePromptsRender();
 
-        $slug = (string) $this->argument('module');
+        $slugs = [];
+        foreach ((array) $this->argument('modules') as $raw) {
+            foreach (explode(',', (string) $raw) as $slug) {
+                $slug = trim($slug);
+                if ($slug !== '' && ! in_array($slug, $slugs, true)) {
+                    $slugs[] = $slug;
+                }
+            }
+        }
 
-        if (! $registry->has($slug)) {
-            $this->error("Unknown module: {$slug}");
+        // Validate the whole list before installing anything, so a typo in
+        // slug 3 of 5 doesn't leave a half-done batch behind.
+        $unknown = array_diff($slugs, array_keys($registry->all()));
+
+        if ($slugs === [] || $unknown !== []) {
+            $this->error($slugs === []
+                ? 'No module slug given.'
+                : 'Unknown module'.(count($unknown) > 1 ? 's' : '').': '.implode(', ', $unknown));
             $this->line('Available: '.implode(', ', array_keys($registry->all())));
 
             return self::FAILURE;
         }
 
-        $meta = $registry->get($slug);
+        foreach ($slugs as $i => $slug) {
+            if ($i > 0) {
+                $this->newLine();
+            }
+            $this->installOne($slug, $registry->get($slug));
+        }
+
+        // When called standalone (not from the parent installer), drain deferred
+        // commands now. The parent runs them after all modules finish.
+        if (! $this->option('from-parent')) {
+            $this->newLine();
+            $this->line('<comment>Running tail commands…</comment>');
+            $this->runDeferredCommands();
+
+            // Regenerate the UiKitUser trait for the now-current installed set
+            // and wire it into the User model. (The parent installer does this
+            // once at the end of all modules.)
+            if (array_intersect($slugs, ['admin-middleware', 'impersonation', 'profile']) !== []) {
+                $this->generateUiKitUserTrait();
+                $this->applyUserTrait();
+            }
+        }
+
+        // Suppress per-module manual notes when invoked by the parent installer
+        // — InstallCommand prints one consolidated final summary covering all
+        // selected modules. When run standalone, surface them here.
+        if (! $this->option('from-parent')) {
+            $manualNotes = [];
+            foreach ($slugs as $slug) {
+                foreach ((array) ($registry->get($slug)['post_install_notes'] ?? []) as $note) {
+                    $manualNotes[] = count($slugs) > 1 ? "<fg=gray>[{$slug}]</> {$note}" : $note;
+                }
+            }
+
+            if (! empty($manualNotes)) {
+                $this->newLine();
+                $this->line('<comment>Manual steps still needed:</comment>');
+                foreach ($manualNotes as $i => $note) {
+                    $this->line('  '.($i + 1).'. '.$note);
+                }
+            }
+        }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Copy, record, and patch a single module (tail commands stay deferred).
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    protected function installOne(string $slug, array $meta): void
+    {
         $this->line("Installing <info>{$meta['label']}</info>...");
 
         if (! empty($meta['composer'])) {
@@ -49,38 +117,7 @@ class InstallModuleCommand extends Command
         // Apply auto-patches and defer artisan commands declared in metadata.
         $this->applyModuleAutomation($slug, $meta);
 
-        // When called standalone (not from the parent installer), drain deferred
-        // commands now. The parent runs them after all modules finish.
-        if (! $this->option('from-parent')) {
-            $this->newLine();
-            $this->line('<comment>Running tail commands…</comment>');
-            $this->runDeferredCommands();
-
-            // Regenerate UiKitUser trait based on the now-current installed set.
-            // (Parent installer regenerates once at the end of all modules.)
-            if (in_array($slug, ['admin-middleware', 'impersonation', 'profile'], true)) {
-                $this->generateUiKitUserTrait();
-            }
-        }
-
         $this->info("Module <comment>{$slug}</comment> installed.");
-
-        // Suppress per-module manual notes when invoked by the parent installer
-        // — InstallCommand prints one consolidated final summary covering all
-        // selected modules. When run standalone, surface them here.
-        if (! $this->option('from-parent')) {
-            $manualNotes = (array) ($meta['post_install_notes'] ?? []);
-
-            if (! empty($manualNotes)) {
-                $this->newLine();
-                $this->line('<comment>Manual steps still needed:</comment>');
-                foreach ($manualNotes as $i => $note) {
-                    $this->line('  '.($i + 1).'. '.$note);
-                }
-            }
-        }
-
-        return self::SUCCESS;
     }
 
     /**

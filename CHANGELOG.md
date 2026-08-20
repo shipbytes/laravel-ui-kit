@@ -10,6 +10,26 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Added
+
+- **`ui-kit:make-admin {email?}`** — promotes a user to admin from the CLI:
+  assigns the Spatie `admin` role when the `admin-middleware` module is
+  installed and sets the `is_admin` flag when the column exists. No email
+  argument → the first user. Replaces the tinker one-liners in the docs.
+- **`ui-kit:install-module` accepts multiple slugs** — space- or
+  comma-separated (`ui-kit:install-module changelog contacts profile`), with
+  `ui-kit:install-modules` as an alias. The batch is validated before
+  anything installs; one unknown slug aborts the whole run.
+
+### Changed
+
+- **The `UiKitUser` trait is applied to `app/Models/User.php` automatically**
+  by `ui-kit:install` and standalone `ui-kit:install-module` runs — no more
+  manual `use UiKitUser;` edit. The patch is idempotent and lint-checked
+  (`php -l`); on any failure the file is reverted and the manual instruction
+  is printed instead. The fresh-app CI job now asserts the auto-application
+  instead of `sed`-ing the trait in.
+
 ## [0.2.0] - 2026-08-20
 
 **Scope reset + audit-fix release.** A full-codebase audit found v0.1.0 had

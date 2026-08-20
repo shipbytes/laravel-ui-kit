@@ -59,7 +59,7 @@ class InstallCommand extends Command
 
         foreach ($selected as $slug) {
             $this->call('ui-kit:install-module', [
-                'module' => $slug,
+                'modules' => [$slug],
                 '--from-parent' => true,
             ]);
         }
@@ -68,8 +68,9 @@ class InstallCommand extends Command
         $this->line('<comment>Running tail commands…</comment>');
         $this->runDeferredCommands();
         $this->generateUiKitUserTrait();
+        $traitApplied = $this->applyUserTrait();
 
-        $this->printFinalSummary($registry, $selected);
+        $this->printFinalSummary($registry, $selected, $traitApplied);
 
         return self::SUCCESS;
     }
@@ -79,7 +80,7 @@ class InstallCommand extends Command
      *
      * @param  array<int, string>  $selected
      */
-    protected function printFinalSummary(ModuleRegistry $registry, array $selected): void
+    protected function printFinalSummary(ModuleRegistry $registry, array $selected, bool $traitApplied = true): void
     {
         $this->newLine();
         $this->line('<fg=green>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</>');
@@ -93,11 +94,10 @@ class InstallCommand extends Command
 
         $step = 1;
 
-        if ($needsUserTrait) {
-            $this->line("  <fg=yellow>{$step}.</> Add the kit's User trait to <info>app/Models/User.php</info>:");
-            $this->line('       <fg=gray>use App\\Models\\Concerns\\UiKitUser;</>');
+        if ($needsUserTrait && ! $traitApplied) {
+            $this->line("  <fg=yellow>{$step}.</> The installer couldn't patch your User model — add the kit's trait to it yourself:");
             $this->line('       <fg=gray>class User extends Authenticatable {</>');
-            $this->line('       <fg=gray>    use UiKitUser;  // <-- add</>');
+            $this->line('       <fg=gray>    use \\App\\Models\\Concerns\\UiKitUser;  // <-- add</>');
             $this->line('       <fg=gray>}</>');
             $this->newLine();
             $step++;
@@ -123,12 +123,10 @@ class InstallCommand extends Command
         $this->newLine();
         $step++;
 
-        if (in_array('admin-middleware', $selected, true)) {
-            $this->line("  <fg=yellow>{$step}.</> Make a user admin:");
-            $this->line('       <fg=gray>php artisan tinker --execute="App\\\\Models\\\\User::find(1)-&gt;assignRole(\'admin\');"</>');
-            $this->newLine();
-            $step++;
-        }
+        $this->line("  <fg=yellow>{$step}.</> Make your first user an admin (register one first, then):");
+        $this->line('       <fg=gray>php artisan ui-kit:make-admin you@example.com</>');
+        $this->newLine();
+        $step++;
 
         // Show any module-specific residual notes.
         $residual = [];

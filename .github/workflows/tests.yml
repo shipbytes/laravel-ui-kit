@@ -129,10 +129,10 @@ jobs:
         working-directory: app
         run: php artisan ui-kit:install --modules=all --no-interaction
 
-      - name: Apply the generated User trait (the one manual step)
+      - name: Installer must have applied the User trait automatically
         working-directory: app
         run: |
-          sed -i 's|use HasFactory, Notifiable;|use HasFactory, Notifiable, \\App\\Models\\Concerns\\UiKitUser;|' app/Models/User.php
+          grep -q 'UiKitUser' app/Models/User.php
           php -l app/Models/User.php
 
       - name: Build frontend assets
@@ -150,6 +150,13 @@ jobs:
       - name: Kit health check
         working-directory: app
         run: php artisan ui-kit:doctor
+
+      - name: make-admin promotes a user (Spatie role path)
+        working-directory: app
+        run: |
+          php artisan tinker --execute="App\Models\User::forceCreate(['name' => 'CI Admin', 'email' => 'ci@example.com', 'password' => bcrypt('secret-ci-pass')]);"
+          php artisan ui-kit:make-admin ci@example.com
+          php artisan tinker --execute="exit(App\Models\User::first()->hasRole('admin') && App\Models\User::first()->is_admin ? 0 : 1);"
 
       - name: HTTP smoke
         working-directory: app

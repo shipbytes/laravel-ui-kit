@@ -37,7 +37,7 @@ class ModuleRegistry
             ],
             'artisan_seed' => ['Database\\Seeders\\AdminRoleSeeder'],
             'post_install_notes' => [
-                'Assign the admin role to your first user: `php artisan tinker --execute="App\\Models\\User::find(1)->assignRole(\'admin\');"`.',
+                'Grant a user the admin role: `php artisan ui-kit:make-admin you@example.com`.',
             ],
         ],
         'support-tickets' => [
