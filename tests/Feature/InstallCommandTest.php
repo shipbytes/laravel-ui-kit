@@ -27,6 +27,17 @@ class InstallCommandTest extends TestCase
         $app['config']->set('database.default', 'testing');
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Mimic a fresh Laravel 12 app's Vite entrypoints (Tailwind v4).
+        (new Filesystem())->ensureDirectoryExists(resource_path('css'));
+        (new Filesystem())->ensureDirectoryExists(resource_path('js'));
+        file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n\n@source '../views';\n");
+        file_put_contents(resource_path('js/app.js'), "import './bootstrap';\n");
+    }
+
     protected function tearDown(): void
     {
         $fs = new Filesystem();
@@ -39,7 +50,10 @@ class InstallCommandTest extends TestCase
             base_path('routes/admin.php'),
             base_path('routes/ui-kit-user.php'),
             resource_path('js/ui-kit.js'),
+            resource_path('js/app.js'),
             resource_path('css/ui-kit.css'),
+            resource_path('css/ui-kit-theme.css'),
+            resource_path('css/app.css'),
             public_path('storage'),
         ] as $file) {
             if (is_link($file) || is_file($file)) {
@@ -110,6 +124,16 @@ class InstallCommandTest extends TestCase
             file_get_contents(base_path('routes/ui-kit-user.php'))
         );
 
+        // Vite entrypoints are wired automatically: the CSS import lands right
+        // after Tailwind's own import, the JS import is appended.
+        $appCss = file_get_contents(resource_path('css/app.css'));
+        $this->assertMatchesRegularExpression(
+            "/@import 'tailwindcss';\n@import '\.\/ui-kit\.css';/",
+            $appCss
+        );
+        $this->assertStringContainsString("import './ui-kit';", file_get_contents(resource_path('js/app.js')));
+        $this->assertFileExists(resource_path('css/ui-kit-theme.css'));
+
         // The single deferred migrate covered core + module migrations.
         $this->assertTrue(Schema::hasColumn('users', 'is_admin'));
         $this->assertTrue(Schema::hasColumn('users', 'avatar_path'));
@@ -132,6 +156,9 @@ class InstallCommandTest extends TestCase
 
         $adminRoutes = file_get_contents(base_path('routes/admin.php'));
         $this->assertSame(1, substr_count($adminRoutes, "name('support.index')"));
+
+        $this->assertSame(1, substr_count(file_get_contents(resource_path('css/app.css')), 'ui-kit.css'));
+        $this->assertSame(1, substr_count(file_get_contents(resource_path('js/app.js')), "import './ui-kit';"));
 
         $this->assertCount(
             1,

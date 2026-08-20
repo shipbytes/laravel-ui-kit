@@ -39,6 +39,7 @@ class InstallCommand extends Command
 
         $this->publishCore();
         $this->configureFortify();
+        $this->patchViteEntrypoints();
 
         // The kit ships at least one core migration (add_is_admin_to_users_table).
         $this->deferMigrate();
@@ -139,6 +140,49 @@ class InstallCommand extends Command
         }
 
         $this->line('<fg=gray>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</>');
+    }
+
+    /**
+     * Wire the kit's CSS/JS into the app's Vite entrypoints so no manual
+     * import edits are needed. Idempotent — skips when already wired.
+     *
+     * The CSS import goes right after `@import 'tailwindcss';` because the
+     * kit's @theme / @custom-variant blocks must follow Tailwind's base
+     * import in the final bundle.
+     */
+    protected function patchViteEntrypoints(): void
+    {
+        $css = resource_path('css/app.css');
+
+        if (file_exists($css)) {
+            $contents = file_get_contents($css);
+
+            if (! str_contains($contents, 'ui-kit.css')) {
+                if (preg_match("/^@import\s+['\"]tailwindcss['\"].*$/m", $contents, $m)) {
+                    $contents = str_replace($m[0], $m[0]."\n@import './ui-kit.css';", $contents);
+                } else {
+                    $contents = rtrim($contents, "\n")."\n@import './ui-kit.css';\n";
+                }
+
+                file_put_contents($css, $contents);
+                $this->line("  ✓ patched <info>resources/css/app.css</info> <comment>@import './ui-kit.css'</comment>");
+            }
+        } else {
+            warning("resources/css/app.css not found — add `@import './ui-kit.css';` to your Tailwind entry CSS yourself.");
+        }
+
+        $js = resource_path('js/app.js');
+
+        if (file_exists($js)) {
+            $contents = file_get_contents($js);
+
+            if (! str_contains($contents, "./ui-kit")) {
+                file_put_contents($js, rtrim($contents, "\n")."\nimport './ui-kit';\n");
+                $this->line("  ✓ patched <info>resources/js/app.js</info> <comment>import './ui-kit'</comment>");
+            }
+        } else {
+            warning("resources/js/app.js not found — add `import './ui-kit';` to your JS entry yourself.");
+        }
     }
 
     protected function publishCore(): void
