@@ -5,7 +5,7 @@ namespace App\Livewire\Profile;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-#[Layout('layouts.admin-sidebar')]
+#[Layout('layouts.user-shell')]
 class ProfilePage extends Component
 {
     public function render()

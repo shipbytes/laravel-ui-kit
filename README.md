@@ -1,90 +1,67 @@
 # Laravel UI Kit
 
-Admin panel + auth UI scaffolding for Laravel 10/11/12/13 with Livewire 3, Volt, Fortify, and Tailwind 3.
+Admin panel + auth UI scaffolding for **Laravel 12+** with Livewire 3, Volt, Fortify, and **Tailwind CSS v4**.
 
-Core + 9 optional modules, installed interactively via `php artisan ui-kit:install`. CI covers PHP 8.1–8.4 × Laravel 10/11/12. See [CHANGELOG.md](CHANGELOG.md) for release notes.
+Core + 7 optional modules, installed by a turnkey `php artisan ui-kit:install`. CI covers PHP 8.2–8.4 on Laravel 12 (plus an experimental Laravel 13 leg) and runs a full fresh-app install → build → `route:cache` → HTTP smoke on every push. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## What you get
 
 ### Always installed (core)
-- **Auth pages** — login, register, forgot/reset password, email verification, confirm password (Livewire Volt + Fortify)
-- **Admin shell** — collapsible sidebar, mobile bottom nav, nav-config-driven from `config/admin.php`
-- **Dashboard stub + Users CRUD**
-- **Tailwind preset** — fonts (Inter/Poppins/Montserrat), brand palette, dark-mode class strategy
-- **Alpine stores** — sidebar collapse (localStorage-persisted), theme toggle
+
+- **Auth pages** — login, register, forgot/reset password, email verification, confirm password, and a **two-factor challenge** page (Livewire Volt + Fortify), all with dark-mode variants
+- **Working 2FA** — the login flow stages a TOTP/recovery-code challenge for users who enabled two-factor auth (enable/confirm UI ships with the `profile` module)
+- **Admin shell** — collapsible sidebar, mobile bottom nav, theme toggle, current-user footer with profile link + logout; nav is config-driven from `config/admin.php`
+- **User shell** — a light authenticated layout (`layouts/user-shell`) used by user-facing pages like `/profile`
+- **Dashboard stub + Users list/detail**
+- **Tailwind v4 theme** — CSS-first `@theme` tokens (brand palette, Inter/Poppins/Montserrat font utilities) and a class-strategy `dark:` variant
+- **Alpine stores** — sidebar collapse (localStorage-persisted), theme toggle with no-flash snippet
+- **`ui-kit:doctor`** — a health check that verifies the install is fully wired
 
 ### Optional modules
+
 | Slug | What it adds | Composer deps |
 |---|---|---|
-| `admin-middleware` | Spatie Permissions wiring (falls back to `is_admin` boolean if skipped) | `spatie/laravel-permission:^6.0` |
+| `admin-middleware` | Spatie Permissions wiring (falls back to `is_admin` boolean if skipped) | `spatie/laravel-permission:^6.10` |
 | `support-tickets` | Admin ticket queue + replies (Mailables left to you) | — |
-| `changelog` | Admin-authored changelog with public feed | `mews/purifier:^3.4` |
+| `changelog` | Admin-authored changelog with public feed helper | `mews/purifier:^3.4` |
 | `contacts` | Contact-form submission inbox | — |
-| `analytics` | UTM tracking, GA4, PostHog (pick any combination) | — |
-| `profile` | Self-service name/email/password/avatar + 2FA toggle | — (optional: `intervention/image`) |
-| `impersonation` | Login-as-user with exit ribbon + button partial | `lab404/laravel-impersonate:^1.7` |
-| `activity-log` | Spatie activity log + filterable admin viewer | `spatie/laravel-activitylog:^4.8` |
-| `dark-mode` | `<x-theme-toggle />` component + no-flash inline snippet | — |
+| `profile` | Self-service name/email/password/avatar + full 2FA management | — (optional: `intervention/image`) |
+| `impersonation` | Login-as-user with exit ribbon + button partial | `lab404/laravel-impersonate:^1.7.5` |
+| `activity-log` | Spatie activity log + filterable admin viewer | `spatie/laravel-activitylog:^4.10` |
 
-Every module prints a numbered **Next steps** checklist after `ui-kit:install-module` — we don't auto-patch your route files or `config/admin.php`.
+Modules that ship models also ship **factories**, so `SupportTicket::factory()` works in your tests out of the box.
 
 ## Requirements
 
-- PHP 8.1+
-- Laravel 10, 11, 12, or 13
-- Livewire 3 + Volt 1.x
-- Node 18+ (for Vite / Tailwind build)
-
-> ⚠️ **Laravel 10 is past its security window.** The package supports it for compatibility, but new projects should target L11+.
+- PHP 8.2+
+- Laravel 12 (Laravel 13 supported in composer constraints; CI leg is experimental)
+- Livewire 3.6+ / Volt 1.7+
+- Tailwind CSS v4 (the default in fresh Laravel 12 apps)
+- Node 18+ (for the Vite build)
 
 ## Before you install — fresh vs. existing app
 
 The kit is designed for **fresh Laravel installs** (no auth scaffolding yet). Running it on top of Breeze, Jetstream, or a custom auth setup will collide.
 
-The installer does a **preflight check** for you — it reads your `composer.lock` for `laravel/breeze` / `laravel/jetstream` and scans for colliding file paths (`routes/auth.php`, `app/Livewire/Forms/LoginForm.php`, `resources/views/livewire/pages/auth/*`). Behaviour:
+The installer runs a **preflight check**: it reads `composer.lock` for `laravel/breeze` / `laravel/jetstream` and scans for colliding files (`routes/auth.php`, `app/Livewire/Forms/LoginForm.php`, auth page views). Behaviour:
 
 - **Jetstream detected** → aborts. Pass `--force` to override (not recommended).
-- **Breeze detected** (or stray auth files) → warns, lists the collisions, and prompts you to confirm.
-- Running `--no-interaction` with collisions present → aborts unless `--force` is set. Keeps CI safe.
+- **Breeze detected** (or stray auth files) → warns, lists the collisions, and prompts to confirm.
+- **A previous kit install detected** (via the `ui-kit:managed` header) → switches to update mode and re-runs cleanly, including with `--no-interaction`.
+- `--no-interaction` with foreign collisions present → aborts unless `--force` is set. Keeps CI safe.
 
-### ✅ Do install on
+The kit only auto-loads route files that carry its `// ui-kit:managed` header — a pre-existing `routes/auth.php` from Breeze or your own code is never hijacked or double-registered.
 
-- **A fresh `laravel new` project** with no auth starter. Zero conflicts, ~2 minutes to a working admin + auth UI.
-- **An existing app that has no auth UI yet** (e.g. an API-only app you're now adding an admin panel to). You'll still want to uninstall any partial auth views from `resources/views/auth/` first.
-
-### ⚠️ Avoid installing on top of
-
-- **Breeze (any stack)** — collides on `routes/auth.php`, `app/Livewire/Forms/LoginForm.php` (Breeze Livewire), and `resources/views/livewire/pages/auth/*`. Without `--force` Laravel silently skips them, leaving you with Breeze's code running under this kit's layouts — usually broken. With `--force`, Breeze is overwritten and may leave orphaned files behind.
-- **Jetstream** — heavy footprint (teams, API tokens, Sanctum-based auth) that this kit doesn't understand. Do not combine.
-- **An app with customized Fortify views/actions** — your customizations will either be skipped or overwritten depending on `--force`.
-
-If you *must* use the kit on top of an existing auth setup, remove the starter first:
+If you must install over Breeze, remove it first:
 
 ```bash
-# Breeze — no official uninstaller, remove by hand:
 composer remove laravel/breeze
 rm -rf app/Http/Controllers/Auth resources/views/auth routes/auth.php
 rm -f app/Livewire/Forms/LoginForm.php app/Livewire/Actions/Logout.php
 rm -rf resources/views/livewire/pages/auth resources/views/components/{input-error,input-label,primary-button,text-input}.blade.php
-
-# Jetstream — no uninstaller, migration is significant. Start from a fresh app.
 ```
 
-Then run the kit installer. Review the generated files before committing — merge anything you wanted to keep from your old setup by hand.
-
-### What the installer publishes (so you can eyeball conflicts)
-
-| Destination | From |
-|---|---|
-| `config/ui-kit.php`, `config/admin.php` | kit-specific, safe |
-| `resources/views/layouts/*`, `components/auth-session-status.blade.php` | **collides with Breeze** |
-| `resources/views/livewire/pages/auth/*` | **collides with Breeze Livewire** |
-| `resources/views/livewire/admin/*` | kit-specific, safe |
-| `app/Livewire/Admin/*`, `app/Livewire/Forms/LoginForm.php` | **`LoginForm` collides with Breeze Livewire** |
-| `routes/auth.php` | **collides with Breeze** |
-| `routes/admin.php` | kit-specific, safe |
-| `resources/js/ui-kit.js`, `resources/css/ui-kit.css` | kit-specific, safe |
-| `database/migrations/..._add_is_admin_to_users_table.php` | kit-specific, timestamped, safe |
+Jetstream has no clean migration path — start from a fresh app.
 
 ## Install
 
@@ -93,23 +70,26 @@ composer require shipbytes/laravel-ui-kit
 php artisan ui-kit:install
 ```
 
-The installer walks you through an interactive module picker. Run `php artisan ui-kit:install --modules=admin-middleware,profile` to skip the prompt.
+The installer walks you through a module picker. Non-interactive variants:
+
+```bash
+php artisan ui-kit:install --modules=admin-middleware,profile
+php artisan ui-kit:install --modules=all
+```
 
 <details>
 <summary><strong>Installing before a Packagist release (or straight from GitHub / a local path)</strong></summary>
 
-Until a version is tagged and submitted to Packagist, or if you're hacking on the kit locally, point Composer at the source directly.
-
-**From GitHub (VCS repository)** — good for tracking `main`:
+**From GitHub (VCS repository):**
 
 ```bash
 composer config repositories.laravel-ui-kit vcs https://github.com/shipbytes/laravel-ui-kit
 composer config minimum-stability dev
 composer config prefer-stable true
-composer require "shipbytes/laravel-ui-kit:dev-main"
+composer require "shipbytes/laravel-ui-kit:dev-master"
 ```
 
-**From a local checkout (path repository)** — good for contributors; symlinks the source into `vendor/` so edits are live:
+**From a local checkout (path repository)** — symlinks the source into `vendor/` so edits are live:
 
 ```bash
 composer config repositories.laravel-ui-kit path /absolute/path/to/laravel-ui-kit
@@ -125,13 +105,21 @@ composer update shipbytes/laravel-ui-kit
 
 </details>
 
-### Finish wiring
+### What the installer automates
 
-The installer does almost everything — publishes assets/configs/migrations, patches `config/fortify.php` and `config/admin.php` (middleware + nav), appends module routes, runs `vendor:publish` for every dependent package, runs one `php artisan migrate`, seeds the admin role, runs `storage:link`, installs npm packages where required, and generates `app/Models/Concerns/UiKitUser.php` based on which modules you picked.
+- Publishes every kit + dependency config, view, class, route file, and migration
+- Patches `config/fortify.php` (`views=false`, `home=/`, passkeys feature off) and publishes Fortify's 2FA columns migration
+- Patches `config/admin.php` nav and `routes/admin.php` / `routes/ui-kit-user.php` between `/* ui-kit:* */` markers — **idempotently**, and without wiping other modules' entries
+- **Wires your Vite entrypoints**: adds `@import './ui-kit.css';` to `resources/css/app.css` and `import './ui-kit';` to `resources/js/app.js`
+- Runs `vendor:publish` for every dependent package, one `php artisan migrate`, seeds the admin role, runs `storage:link`
+- Generates `app/Models/Concerns/UiKitUser.php` bundling exactly the traits your chosen modules need (Spatie `HasRoles`, lab404 `Impersonate`, Fortify `TwoFactorAuthenticatable`)
+- Auto-loads `routes/auth.php`, `routes/admin.php`, `routes/ui-kit-user.php` from the service provider — no `bootstrap/app.php` edit
+- Registers sane `login` / `two-factor` rate limiters unless your app already defines them
 
-That leaves a small irreducible checklist you do **once**:
+### Finish wiring (the irreducible checklist)
 
-1. **Add the kit's User trait** (only if you picked `admin-middleware` or `impersonation`):
+1. **Add the kit's User trait** (only if you picked `admin-middleware`, `impersonation`, or `profile`):
+
    ```php
    // app/Models/User.php
    use App\Models\Concerns\UiKitUser;
@@ -139,67 +127,41 @@ That leaves a small irreducible checklist you do **once**:
    class User extends Authenticatable
    {
        use UiKitUser;   // <-- add this line
-       // ... your existing traits
    }
    ```
-2. **Add the kit's component tags to your master layout** (`resources/views/layouts/app.blade.php`):
-   ```blade
-   <head>
-       <x-ui-kit::head />        {{-- analytics + dark-mode no-flash --}}
-   </head>
-   <body>
-       <x-ui-kit::banners />     {{-- impersonation ribbon (auto-hides) --}}
-       {{ $slot ?? '' }}
-   </body>
-   ```
-3. **Add the Tailwind preset and import the kit's JS/CSS into your Vite bundles:**
-   ```js
-   // tailwind.config.js
-   module.exports = {
-       presets: [require('shipbytes/laravel-ui-kit/tailwind-preset')],
-       content: [
-           './resources/**/*.blade.php',
-           './resources/**/*.js',
-           './app/**/*.php',
-       ],
-   };
-   ```
-   ```js
-   // resources/js/app.js
-   import './ui-kit';
-   ```
-   ```css
-   /* resources/css/app.css */
-   @import './ui-kit.css';
-   ```
-4. **Set required `.env` keys:**
+
+2. **Set `.env` mail keys** (password reset / verification emails):
+
    ```dotenv
-   MAIL_MAILER=log                # use 'smtp'/'mailgun'/etc. for production
+   MAIL_MAILER=log                # 'smtp'/'mailgun'/etc. for production
    MAIL_FROM_ADDRESS="noreply@example.com"
    MAIL_FROM_NAME="${APP_NAME}"
-
-   GOOGLE_ANALYTICS_ID=           # optional: only if you picked analytics:ga4
-   POSTHOG_PUBLIC_KEY=             # optional: only if you picked analytics:posthog
    ```
-5. **Build assets, then make a user admin:**
+
+3. **Build assets, then make your first user admin:**
+
    ```bash
    npm install && npm run dev
 
-   # Promote your test account to admin (only if admin-middleware is installed)
+   # only if admin-middleware is installed:
    php artisan tinker --execute="App\Models\User::find(1)->assignRole('admin');"
+   # without admin-middleware, set the is_admin flag instead:
+   php artisan tinker --execute="App\Models\User::find(1)->forceFill(['is_admin' => true])->save();"
    ```
 
-That's it. `/register`, `/login`, `/admin`, `/profile`, and every module's admin page should work.
+4. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table of everything above (published files, Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
 
-> **What the installer handled for you**
-> - Published every kit + dependency config (Fortify, Spatie Permission, mews/purifier, lab404/impersonate, Spatie Activitylog).
-> - Patched `config/fortify.php` (`views=false`), `config/admin.php` (middleware swap + nav entries between `/* ui-kit:nav-* */` markers), and `routes/admin.php` (module routes between `/* ui-kit:admin-routes-* */` markers).
-> - Auto-loads `routes/auth.php`, `routes/admin.php`, and `routes/ui-kit-user.php` from the service provider — no `bootstrap/app.php` edit required.
-> - Pushed the UTM-capture middleware into the `web` group at runtime (when `analytics:utm` is installed), so you don't have to register it manually.
-> - Reads `GOOGLE_ANALYTICS_ID` / `POSTHOG_PUBLIC_KEY` / `POSTHOG_HOST` directly from `.env` into `services.google.*` and `services.posthog.*` at boot — no `config/services.php` edit needed.
-> - Generated `app/Models/Concerns/UiKitUser.php` bundling whatever traits and methods your installed modules require.
-> - All patches are **idempotent** — re-running `ui-kit:install` (or installing more modules later) won't duplicate nav entries or routes.
-> - On Windows cmd / Laragon / some WSL emulators, the picker uses a plain numbered-list prompt instead of Laravel Prompts' alt-screen rendering. Override with `UI_KIT_PROMPTS_FALLBACK=0` (force fancy) or `=1` (force plain).
+If your app has its own master layout for public pages, drop the kit's head/banner components into it so dark-mode no-flash and the impersonation ribbon work there too:
+
+```blade
+<head>
+    <x-ui-kit::head />
+</head>
+<body>
+    <x-ui-kit::banners />
+```
+
+(The kit's own layouts — guest, admin, user shell — already include them.)
 
 ## Configuration
 
@@ -214,7 +176,20 @@ That's it. `/register`, `/login`, `/admin`, `/profile`, and every module's admin
 ],
 ```
 
-Drop your logo PNG/SVG at `public/images/logo.png` (or override `UI_KIT_BRAND_LOGO` to point anywhere else). `home_route` is the route name used by the "back to site" link in the admin shell.
+Drop a logo at `public/images/logo.png` (or point `UI_KIT_BRAND_LOGO` anywhere, including a full URL). Until a logo exists the layouts render an initial badge, so nothing looks broken on a fresh install. `home_route` names the route used for "back to site" links and post-login redirects — **when the route doesn't exist the kit falls back to `/`**, so fresh apps work without defining one.
+
+### Tailwind theme
+
+The design tokens live in `resources/css/ui-kit-theme.css` (Tailwind v4 `@theme`):
+
+```css
+@theme {
+    --color-brand-500: #6366f1;   /* bg-brand-500, text-brand-600, … */
+    --font-boldtext: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+}
+```
+
+Override any token in your own CSS after the import — last definition wins. Dark mode uses a `dark` class on `<html>` (toggled by `<x-theme-toggle />`, persisted to localStorage, no-flash on load).
 
 ### Sidebar navigation
 
@@ -224,15 +199,15 @@ Drop your logo PNG/SVG at `public/images/logo.png` (or override `UI_KIT_BRAND_LO
     ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'grid'],
     ['label' => 'Users', 'route' => 'admin.users.index', 'icon' => 'users'],
     ['section' => 'Support'],
-    ['label' => 'Tickets', 'route' => 'admin.tickets.index', 'icon' => 'ticket', 'badge' => 'open_tickets'],
+    ['label' => 'Tickets', 'route' => 'admin.support.index', 'icon' => 'ticket', 'badge' => 'open_tickets'],
 ],
 ```
 
-Each installed module's `Next steps` checklist tells you the exact nav entry to paste.
+Modules append their own entries automatically between the `/* ui-kit:nav-* */` markers.
 
 ### Sidebar badges
 
-Bind your own resolver so sidebar counters (e.g. "open tickets: 12") reflect your data:
+Bind your own resolver so counters (e.g. "open tickets: 12") reflect your data:
 
 ```php
 // In a service provider
@@ -242,16 +217,55 @@ $this->app->bind(
 );
 ```
 
-The resolver returns `['open_tickets' => 12, 'unread_contacts' => 3, ...]` — keys match the `badge` field on nav items.
+The resolver returns `['open_tickets' => 12, 'unread_contacts' => 3]` — keys match the `badge` field on nav items.
 
-## Environment & credentials
+## Two-factor authentication
 
-This section is a single place to see **every `.env` key** the kit can read, with links to where to generate the values. Only the **Mail** block is required for a production-ready install; everything else depends on which modules you enable.
+Fortify's `twoFactorAuthentication` feature is enabled by default. With the `profile` module installed (which adds `TwoFactorAuthenticatable` to the generated trait and ensures the columns exist), users get the full flow:
 
-### `.env` reference
+1. **Enable** on `/profile` → scan the QR code → (when Fortify's `confirm` option is on) enter a code to confirm → save recovery codes.
+2. **Login** validates credentials first, then redirects 2FA users to `/two-factor-challenge` for a TOTP or recovery code. Both steps are rate limited.
+3. **Disable / regenerate recovery codes** any time from the profile page.
+
+Without the `profile` module (or without the trait applied), login simply never challenges — nothing breaks.
+
+## Installing modules later
+
+```bash
+php artisan ui-kit:install-module support-tickets
+php artisan ui-kit:list-modules
+php artisan ui-kit:doctor
+```
+
+Re-running `ui-kit:install` is safe: it detects the existing install, keeps your files (pass `--force` to overwrite), and never duplicates nav entries, routes, or migrations.
+
+## Module deep-dives
+
+### `admin-middleware`
+Ships `EnsureUserIsAdmin` (Spatie role check) + `AdminRoleSeeder`. The installer publishes Spatie's config/migrations, migrates, seeds the `admin`/`user` roles, and swaps the middleware in `config/admin.php` from the `is_admin` fallback to the role check. You add `use UiKitUser;` and `assignRole('admin')` for your first admin.
+
+### `support-tickets`
+Admin-only queue (the public form is yours to build). Search by name/email, filter by status/priority/category, inline replies, open-count badge. Status/priority changes are validated server-side. Mailables are intentionally omitted so you plug in your own notification flow.
+
+### `changelog`
+Admin CRUD + `ChangelogEntry::published()` scope for a public feed. HTML is sanitized via `mews/purifier`. For a public page, add a route rendering your own view over the `published()` scope (the module ships only the admin side).
+
+### `contacts`
+Inbox for a public contact form that writes to `contact_submissions`. Read/unread, archive, bulk actions, reply drafts (bring your own Mailable). When `support-tickets` is also installed, a **Copy to Ticket** button appears automatically.
+
+### `profile`
+Cards under `/profile` (rendered in the user shell, not the admin shell): update info + avatar, update password, two-factor authentication, delete account. Avatars are stored under a content-derived extension and resized to 200×200 when `intervention/image` is installed.
+
+### `impersonation`
+Two Blade partials over `lab404/laravel-impersonate`. `<x-ui-kit::banners />` shows the exit ribbon automatically; `@include('partials.impersonation-button', ['user' => $user])` renders the login-as button. The generated `UiKitUser` trait provides `canImpersonate()` / `canBeImpersonated()`.
+
+### `activity-log`
+Paginated admin viewer over `spatie/laravel-activitylog`. Filters: log stream, causer email, date range. Add the `LogsActivity` trait to models you want logged (see Spatie's docs).
+
+## Environment reference
 
 ```dotenv
-# --- Branding (all optional; sensible defaults if unset) -----------------
+# --- Branding (all optional; sensible defaults) --------------------------
 UI_KIT_BRAND_NAME="Acme"
 UI_KIT_BRAND_LOGO="/images/logo.png"
 UI_KIT_HOME_ROUTE="home"
@@ -265,176 +279,30 @@ MAIL_PASSWORD=your-smtp-password
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS="noreply@example.com"
 MAIL_FROM_NAME="${APP_NAME}"
-
-# --- Analytics module: GA4 (only if you installed analytics+ga4) ---------
-GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX
-
-# --- Analytics module: PostHog (only if you installed analytics+posthog) -
-POSTHOG_PUBLIC_KEY=phc_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POSTHOG_HOST=https://us.i.posthog.com   # or https://eu.i.posthog.com
 ```
 
-### Mail (for auth emails)
-
-Fortify sends password-reset and email-verification messages through Laravel's mailer. Out of the box, `MAIL_MAILER=log` works for local dev (mail goes to `storage/logs/laravel.log`). For production, pick any supported driver — Mailgun, Postmark, SES, Resend, or SMTP. See the [Laravel mail docs](https://laravel.com/docs/mail) for driver-specific setup.
-
-If you don't configure mail, the UI will appear to work but users will never receive verification or reset emails.
-
-### GA4 (Google Analytics 4)
-
-**1. Generate a Measurement ID.**
-1. Go to [analytics.google.com](https://analytics.google.com).
-2. Admin (gear icon, bottom-left) → **Create** → **Property** (or pick an existing one).
-3. Inside the property: **Data streams** → **Add stream** → **Web** → enter your site URL.
-4. Copy the **Measurement ID**. It looks like `G-XXXXXXXXXX`.
-
-**2. Paste it into `.env`.**
-
-```dotenv
-GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX
-```
-
-**3. Register the config key** in `config/services.php` (add this once):
-
-```php
-'google' => [
-    'analytics_id' => env('GOOGLE_ANALYTICS_ID'),
-],
-```
-
-**4. Include the loader** in your app layout, just before `</head>`:
-
-```blade
-@include('partials.ga4')
-```
-
-**5. Consent gating.** The loader only fires once a `cookie_consent=accepted` cookie is present. Set that cookie from your consent banner (or manually in dev via DevTools) — otherwise the GA4 script never runs. This is intentional so you're GDPR/CCPA-ready.
-
-Verify it's working: open your site, accept the cookie banner, and watch **Realtime** in the GA4 UI. You should see yourself within ~30 seconds.
-
-### PostHog
-
-**1. Grab your Project API Key.**
-1. Sign up / log in at [posthog.com](https://posthog.com) (or run self-hosted).
-2. Pick the project you want to track into.
-3. **Settings** (gear icon, bottom-left) → **Project** → **General** → copy **Project API Key**. It starts with `phc_…`.
-4. Note your **host**: `https://us.i.posthog.com` for PostHog Cloud US, `https://eu.i.posthog.com` for EU, or your own URL for self-hosted.
-
-**2. Paste into `.env`.**
-
-```dotenv
-POSTHOG_PUBLIC_KEY=phc_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-POSTHOG_HOST=https://us.i.posthog.com
-```
-
-**3. Register config keys** in `config/services.php`:
-
-```php
-'posthog' => [
-    'public_key' => env('POSTHOG_PUBLIC_KEY'),
-    'host'       => env('POSTHOG_HOST', 'https://us.i.posthog.com'),
-],
-```
-
-**4. Include the loader** in your app layout, just before `</head>`:
-
-```blade
-@include('partials.posthog')
-```
-
-**5. Install the JS SDK + bridge** so server-side Livewire events can capture PostHog events:
-
-```bash
-npm install posthog-js
-```
-
-```js
-// resources/js/app.js
-import './posthog-bridge';
-```
-
-**6. Capture events from Livewire:**
-
-```php
-$this->dispatch('posthog-capture', event: 'ticket_replied', properties: [
-    'ticket_id' => $ticket->id,
-]);
-```
-
-**7. Consent gating.** Same as GA4 — the loader waits for `cookie_consent=accepted`. Verify in the PostHog **Live events** tab.
-
-> ⚠️ Only use your **public** project key (`phc_…`). The personal / private API key should never land in frontend code.
-
-### UTM tracking (analytics module, UTM provider)
-
-No external service or key needed. Once you register the middleware, anyone who hits your site with `?utm_source=…&utm_medium=…&utm_campaign=…` on the URL gets the values stashed in their session (and attached to the User model on signup). The UTM Link Builder page (`/admin/analytics/utm`) generates tagged URLs for your campaigns.
-
-## Installing modules later
-
-```bash
-php artisan ui-kit:install-module support-tickets
-php artisan ui-kit:install-module analytics --providers=utm,posthog
-php artisan ui-kit:list-modules
-```
-
-## Module deep-dives
-
-### `admin-middleware`
-Ships `EnsureUserIsAdmin` (Spatie role check) + `AdminRoleSeeder`. The installer publishes Spatie's config/migrations, runs `migrate` and `db:seed --class=AdminRoleSeeder`, swaps the middleware in `config/admin.php` from the fallback to `App\Http\Middleware\EnsureUserIsAdmin::class`, and generates `App\Models\Concerns\UiKitUser` bundling Spatie's `HasRoles` trait. You add `use UiKitUser;` to your User model and `assignRole('admin')` to one user.
-
-### `support-tickets`
-Admin-only queue (public form is yours to build). Search by name/email, filter by status/priority, inline replies. Mailables are intentionally omitted so you plug in your own notification flow.
-
-### `changelog`
-Admin CRUD + public feed helper. HTML sanitization via `mews/purifier`. Each entry has a status (`published`/`draft`) and a category.
-
-### `contacts`
-Inbox for a public contact form that writes to `contact_submissions`. When the `support-tickets` module is also installed, a **Copy to Ticket** button auto-appears — no config needed.
-
-### `analytics`
-Three providers — pick any combination at install time. See [Environment & credentials](#environment--credentials) above for the full GA4 / PostHog setup walkthroughs.
-
-- **UTM** — middleware captures `?utm_*` → session, User model columns, and a Livewire-powered link builder at `/admin/analytics/utm`. No external service required.
-- **GA4** — consent-gated `@include('partials.ga4')` loader. Needs `GOOGLE_ANALYTICS_ID`.
-- **PostHog** — consent-gated loader + Livewire→PostHog JS bridge. Needs `POSTHOG_PUBLIC_KEY` (+ optional `POSTHOG_HOST`).
-
-Both GA4 and PostHog loaders gate on `cookie_consent=accepted`. Set that cookie from your consent banner (or your tests).
-
-### `profile`
-Four Livewire/Volt cards under a single `ProfilePage`: update info + avatar, update password, 2FA (Fortify, auto-hidden if not installed), delete account. Ships `x-modal` and `x-action-message` components. Resizes avatars to 200×200 if `intervention/image` is installed, otherwise stores the raw upload. Don't forget `php artisan storage:link` so `/storage/avatars/...` is publicly reachable.
-
-### `impersonation`
-Two Blade partials (`impersonation-banner`, `impersonation-button`) over `lab404/laravel-impersonate`. The package auto-registers routes; you just `@include` the banner in your layout and the button in the user detail view. Requires `canImpersonate()` + `canBeImpersonated()` methods on your User model.
-
-### `activity-log`
-Paginated admin viewer over `spatie/laravel-activitylog`'s `activity_log` table. Filters: log stream, causer email, date range. Add the `LogsActivity` trait on your models per [Spatie's README](https://spatie.be/docs/laravel-activitylog).
-
-### `dark-mode`
-Alpine `$store.theme` ships in core/`ui-kit.js`. Drop `<x-theme-toggle />` anywhere and inline the no-flash snippet before `</head>`. Every core view and every shipped module has `dark:` variants already.
-
-## Laravel version caveats
-
-- **L10:** Volt routes require explicit `Volt::mount()`. The service provider calls it automatically when it detects published Volt pages. EOL'd security support — bump to L11+ when you can.
-- **L11:** middleware registration moved to `bootstrap/app.php`. Post-install notes call out the relevant `bootstrap/app.php` vs `Http/Kernel.php` snippet so you know where to drop in the new middleware.
-- **L12:** current LTS-ish target — the default for new projects using this kit.
-- **L13:** newly released (per PHP/Fortify/Spatie peer-dep readiness). CI runs 10/11/12 until the ecosystem catches up; bump `composer.json` locally if you want to try it early.
+In local dev, `MAIL_MAILER=log` works — mail lands in `storage/logs/laravel.log`.
 
 ## Troubleshooting
 
-- **`/login` returns 500 with "Vite manifest not found"** — run `npm run dev` or `npm run build`. Vite must emit a manifest before Blade's `@vite` directive can resolve it.
-- **Password reset / verification emails never arrive** — check `MAIL_*` in `.env`. In local dev, set `MAIL_MAILER=log` and tail `storage/logs/laravel.log`.
-- **GA4 / PostHog not firing** — open DevTools → Application → Cookies and confirm `cookie_consent=accepted` is set. Both loaders are consent-gated by design.
+Run `php artisan ui-kit:doctor` first — it catches the common ones and prints the fix.
+
+- **`/login` returns 500 with "Vite manifest not found"** — run `npm run dev` or `npm run build`.
+- **Password reset / verification emails never arrive** — check `MAIL_*` in `.env`.
+- **"Unauthorized" on `/admin`** — the fallback middleware requires `$user->is_admin` to be truthy; with `admin-middleware` installed you need the `admin` role assigned.
 - **Sidebar badges show 0 / blank** — bind your own `SidebarBadgeResolver`; the default returns an empty array.
-- **"Unauthorized" on `/admin`** — either the default fallback middleware is rejecting you (it requires `$user->is_admin` to be truthy) or you installed `admin-middleware` and haven't assigned the `admin` role yet.
+- **`route:cache` fails with a duplicate name** — the doctor lists the duplicates; usually a route file was copied without its `ui-kit:managed` header and loaded twice by hand.
 
 ## Testing the package
 
 ```bash
 composer install
-vendor/bin/phpunit
+vendor/bin/phpunit          # includes an end-to-end installer test + HTTP render tests
+vendor/bin/pint --test
+vendor/bin/phpstan analyse
 ```
 
-Tests run against Orchestra Testbench. CI (`.github/workflows/tests.yml`) matrixes PHP 8.1–8.4 × Laravel 10/11/12.
+CI additionally builds a fresh Laravel 12 app, installs every module, builds assets, caches routes, runs the doctor, and smoke-tests the HTTP pages.
 
 ## License
 

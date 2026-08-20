@@ -4,9 +4,12 @@ use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Shipbytes\UiKit\Support\UiKit;
 
 new #[Layout('layouts.guest')] class extends Component
 {
@@ -17,6 +20,19 @@ new #[Layout('layouts.guest')] class extends Component
 
     public function register(): void
     {
+        $throttleKey = 'register:'.request()->ip();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 10)) {
+            throw ValidationException::withMessages([
+                'email' => trans('auth.throttle', [
+                    'seconds' => RateLimiter::availableIn($throttleKey),
+                    'minutes' => ceil(RateLimiter::availableIn($throttleKey) / 60),
+                ]),
+            ]);
+        }
+
+        RateLimiter::hit($throttleKey, 3600);
+
         $emailRules = ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class];
 
         if (config('ui-kit.features.disposable_email_block')) {
@@ -37,58 +53,56 @@ new #[Layout('layouts.guest')] class extends Component
 
         Auth::login($user);
 
-        $this->redirectIntended(default: route(config('ui-kit.brand.home_route'), absolute: false), navigate: true);
+        $this->redirectIntended(default: UiKit::homeUrl(), navigate: true);
     }
 }; ?>
 
 <div>
     <div class="text-center mb-8">
-        <h1 class="text-2xl font-boldtext tracking-tight text-gray-950">{{ config('ui-kit.copy.register.heading') }}</h1>
-        <p class="mt-2 text-sm text-gray-500 font-booktext">{{ config('ui-kit.copy.register.subheading') }}</p>
+        <h1 class="text-2xl font-boldtext tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.copy.register.heading') }}</h1>
+        <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-booktext">{{ config('ui-kit.copy.register.subheading') }}</p>
     </div>
-
-    @include('layouts.partials.social-buttons')
 
     <form wire:submit="register" class="space-y-5">
         <div>
-            <label for="name" class="block text-sm font-semibold text-gray-950 mb-2">Name</label>
+            <label for="name" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Name</label>
             <input wire:model="name" id="name" type="text" name="name" required autofocus autocomplete="name"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
+                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
                    placeholder="Jane Doe">
             @error('name') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
 
         <div>
-            <label for="email" class="block text-sm font-semibold text-gray-950 mb-2">Email</label>
+            <label for="email" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Email</label>
             <input wire:model="email" id="email" type="email" name="email" required autocomplete="username"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
+                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
                    placeholder="you@example.com">
             @error('email') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
 
         <div>
-            <label for="password" class="block text-sm font-semibold text-gray-950 mb-2">Password</label>
+            <label for="password" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Password</label>
             <input wire:model="password" id="password" type="password" name="password" required autocomplete="new-password"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
+                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
                    placeholder="Create a password">
             @error('password') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
 
         <div>
-            <label for="password_confirmation" class="block text-sm font-semibold text-gray-950 mb-2">Confirm password</label>
+            <label for="password_confirmation" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Confirm password</label>
             <input wire:model="password_confirmation" id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
+                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
                    placeholder="Confirm your password">
             @error('password_confirmation') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
 
-        <button type="submit" class="flex w-full justify-center rounded-full bg-gray-950 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 transition-all hover:shadow-lg hover:shadow-gray-950/20">
+        <button type="submit" class="flex w-full justify-center rounded-full bg-gray-950 dark:bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 dark:hover:bg-indigo-500 transition-all hover:shadow-lg hover:shadow-gray-950/20">
             Create account
         </button>
     </form>
 
-    <p class="mt-6 text-center text-sm text-gray-500 font-booktext">
+    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-booktext">
         Already have an account?
-        <a href="{{ route('login') }}" wire:navigate class="font-semibold text-indigo-600 hover:text-indigo-500 transition-colors">Sign in</a>
+        <a href="{{ route('login') }}" wire:navigate class="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">Sign in</a>
     </p>
 </div>

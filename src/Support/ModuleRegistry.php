@@ -12,8 +12,6 @@ class ModuleRegistry
      *
      * Recognised keys (all optional except label + summary):
      *   - composer: composer packages to require before copying stubs
-     *   - npm: npm packages to install after copying stubs
-     *   - providers: provider slugs (analytics only — utm/ga4/posthog)
      *   - admin_routes: array of route lines to inject between
      *       /* ui-kit:admin-routes-start *\/  ...  /* ui-kit:admin-routes-end *\/
      *     in routes/admin.php
@@ -32,14 +30,14 @@ class ModuleRegistry
         'admin-middleware' => [
             'label' => 'Admin middleware + Spatie Permissions',
             'summary' => 'Route gating via roles/permissions. Falls back to an is_admin boolean column if skipped.',
-            'composer' => ['spatie/laravel-permission:^6.0'],
+            'composer' => ['spatie/laravel-permission:^6.10'],
             'admin_middleware_swap' => true,
             'artisan_publish' => [
                 ['--provider' => 'Spatie\\Permission\\PermissionServiceProvider'],
             ],
             'artisan_seed' => ['Database\\Seeders\\AdminRoleSeeder'],
             'post_install_notes' => [
-                'Assign the admin role to a user: `php artisan tinker --execute="App\\Models\\User::find(1)->assignRole(\'admin\');"`.',
+                'Assign the admin role to your first user: `php artisan tinker --execute="App\\Models\\User::find(1)->assignRole(\'admin\');"`.',
             ],
         ],
         'support-tickets' => [
@@ -73,7 +71,7 @@ class ModuleRegistry
                 ['--provider' => 'Mews\\Purifier\\PurifierServiceProvider'],
             ],
             'post_install_notes' => [
-                'Optional public feed: add to routes/web.php — Route::get(\'changelog\', fn () => view(\'changelog.public\', [\'entries\' => \\App\\Models\\ChangelogEntry::published()->orderBy(\'published_at\', \'desc\')->get()]))->name(\'changelog.public\');',
+                'Optional public feed: add to routes/web.php — Route::get(\'changelog\', fn () => view(\'changelog.public\', [\'entries\' => \\App\\Models\\ChangelogEntry::published()->orderBy(\'published_at\', \'desc\')->get()]))->name(\'changelog.public\'); (you supply the changelog.public view).',
             ],
         ],
         'contacts' => [
@@ -91,53 +89,21 @@ class ModuleRegistry
                 'The "Copy to Ticket" button auto-appears when the support-tickets module is installed.',
             ],
         ],
-        'analytics' => [
-            'label' => 'Analytics',
-            'summary' => 'Product analytics: UTM tracking, GA4, and/or PostHog. Pick providers at install time.',
-            'providers' => ['utm', 'ga4', 'posthog'],
-            // Per-provider metadata. The installer reads this when a provider is enabled.
-            'providers_meta' => [
-                'utm' => [
-                    'admin_routes' => [
-                        "Route::get('analytics/utm', \\App\\Livewire\\Admin\\Analytics\\UtmLinkBuilder::class)->name('analytics.utm');",
-                    ],
-                    'admin_nav' => [
-                        ['label' => 'UTM Links', 'route' => 'admin.analytics.utm', 'icon' => 'link'],
-                    ],
-                ],
-                'posthog' => [
-                    'npm' => ['posthog-js'],
-                    'post_install_notes' => [
-                        'Set `POSTHOG_PUBLIC_KEY=phc_...` (and optionally `POSTHOG_HOST`) in .env to activate PostHog.',
-                        'Add `import \'./posthog-bridge\';` to resources/js/app.js after `import \'./ui-kit\';`.',
-                    ],
-                ],
-                'ga4' => [
-                    'post_install_notes' => [
-                        'Set `GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX` in .env to activate GA4.',
-                    ],
-                ],
-            ],
-            'post_install_notes' => [
-                'Both GA4 and PostHog loaders gate on `cookie_consent=accepted`. Set that cookie from your consent banner.',
-            ],
-        ],
         'profile' => [
             'label' => 'Profile page',
-            'summary' => 'Self-service name/email/password/avatar + 2FA toggle.',
+            'summary' => 'Self-service name/email/password/avatar + two-factor authentication.',
             'user_routes' => [
                 "Route::get('profile', \\App\\Livewire\\Profile\\ProfilePage::class)->name('profile');",
             ],
             'storage_link' => true,
             'post_install_notes' => [
                 'Optional: `composer require intervention/image` to enable automatic 200×200 avatar resizing.',
-                'Optional: enable 2FA by adding `Features::twoFactorAuthentication()` to config/fortify.php. The 2FA card is hidden automatically when Fortify isn\'t configured for it.',
             ],
         ],
         'impersonation' => [
             'label' => 'Impersonation (admin-as-user)',
             'summary' => 'Login-as-user from admin, with an exit-impersonation ribbon.',
-            'composer' => ['lab404/laravel-impersonate:^1.7'],
+            'composer' => ['lab404/laravel-impersonate:^1.7.5'],
             'artisan_publish' => [
                 ['--tag' => 'impersonate'],
             ],
@@ -148,7 +114,7 @@ class ModuleRegistry
         'activity-log' => [
             'label' => 'Activity log',
             'summary' => 'Audit trail via spatie/laravel-activitylog + admin viewer.',
-            'composer' => ['spatie/laravel-activitylog:^4.8'],
+            'composer' => ['spatie/laravel-activitylog:^4.10'],
             'admin_routes' => [
                 "Route::get('activity', \\App\\Livewire\\Admin\\Activity\\ActivityViewer::class)->name('activity.index');",
             ],
@@ -160,14 +126,6 @@ class ModuleRegistry
             ],
             'post_install_notes' => [
                 'On each model you want logged, add the `Spatie\\Activitylog\\Traits\\LogsActivity` trait and a `getActivitylogOptions()` method (see the package README).',
-            ],
-        ],
-        'dark-mode' => [
-            'label' => 'Dark mode',
-            'summary' => 'Theme store with localStorage persistence and dark: variants across the shell.',
-            'post_install_notes' => [
-                // No-flash + theme toggle now ship via <x-ui-kit-head /> and the
-                // admin shell already includes <x-theme-toggle />. Nothing to do.
             ],
         ],
     ];
@@ -199,14 +157,6 @@ class ModuleRegistry
 
     public function isInstalled(string $slug): bool
     {
-        $installed = config('ui-kit.installed_modules', []);
-
-        if (is_string($slug) && str_contains($slug, ':')) {
-            [$module, $provider] = explode(':', $slug, 2);
-
-            return in_array($provider, $installed[$module] ?? [], true);
-        }
-
-        return array_key_exists($slug, $installed);
+        return in_array($slug, config('ui-kit.installed_modules', []), true);
     }
 }

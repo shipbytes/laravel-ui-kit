@@ -1,7 +1,13 @@
 /**
- * UI Kit base styles. Import once from resources/css/app.css:
+ * UI Kit base styles (Tailwind CSS v4).
+ *
+ * The installer imports this once from resources/css/app.css, after the
+ * `@import 'tailwindcss';` line:
+ *
  *   @import './ui-kit.css';
  */
+
+@import './ui-kit-theme.css';
 
 [x-cloak] {
     display: none !important;
@@ -18,4 +24,11 @@
 
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
+}
+
+/* Native form controls pick up the brand color without needing the
+   @tailwindcss/forms plugin. */
+input[type='checkbox'],
+input[type='radio'] {
+    accent-color: var(--color-brand-600, #4f46e5);
 }

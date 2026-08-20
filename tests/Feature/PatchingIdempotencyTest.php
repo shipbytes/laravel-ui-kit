@@ -2,13 +2,17 @@
 
 namespace Shipbytes\UiKit\Tests\Feature;
 
-use Shipbytes\UiKit\Tests\TestCase;
-use Shipbytes\UiKit\Console\InstallModuleCommand;
+use Illuminate\Console\OutputStyle;
 use Illuminate\Filesystem\Filesystem;
+use Shipbytes\UiKit\Console\InstallModuleCommand;
+use Shipbytes\UiKit\Tests\TestCase;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 
 class PatchingIdempotencyTest extends TestCase
 {
     private string $configDir;
+
     private string $routesDir;
 
     protected function setUp(): void
@@ -18,8 +22,8 @@ class PatchingIdempotencyTest extends TestCase
         $this->configDir = config_path();
         $this->routesDir = base_path('routes');
 
-        (new Filesystem())->ensureDirectoryExists($this->configDir);
-        (new Filesystem())->ensureDirectoryExists($this->routesDir);
+        (new Filesystem)->ensureDirectoryExists($this->configDir);
+        (new Filesystem)->ensureDirectoryExists($this->routesDir);
 
         // Seed the published files with markers, mimicking what
         // `php artisan vendor:publish --tag=ui-kit-config|ui-kit-routes` does.
@@ -58,6 +62,31 @@ class PatchingIdempotencyTest extends TestCase
 
         $this->assertSame(1, $countFirst, 'first patch should add one entry');
         $this->assertSame(1, $countSecond, 'second patch must not duplicate');
+    }
+
+    public function test_admin_nav_patch_preserves_entries_from_other_modules(): void
+    {
+        $command = $this->makeCommand();
+
+        // Install support-tickets' nav entry first, then contacts'. The block
+        // between the markers is replaced wholesale, so the second patch must
+        // carry the first module's entry forward instead of wiping it.
+        $this->invoke($command, 'patchAdminNav', [[
+            ['label' => 'Support', 'route' => 'admin.support.index', 'icon' => 'ticket'],
+        ]]);
+        $this->invoke($command, 'patchAdminNav', [[
+            ['label' => 'Contacts', 'route' => 'admin.contacts.index', 'icon' => 'mail'],
+        ]]);
+
+        $contents = file_get_contents($this->configDir.'/admin.php');
+
+        $this->assertStringContainsString('admin.support.index', $contents, 'earlier module nav entry was wiped by a later install');
+        $this->assertStringContainsString('admin.contacts.index', $contents);
+
+        $parsed = require $this->configDir.'/admin.php';
+        $routes = array_column(array_filter($parsed['nav'], fn ($i) => isset($i['route'])), 'route');
+        $this->assertContains('admin.support.index', $routes);
+        $this->assertContains('admin.contacts.index', $routes);
     }
 
     public function test_admin_routes_patch_is_idempotent(): void
@@ -108,13 +137,13 @@ class PatchingIdempotencyTest extends TestCase
 
     private function makeCommand(): InstallModuleCommand
     {
-        $command = new InstallModuleCommand();
+        $command = new InstallModuleCommand;
         $command->setLaravel($this->app);
 
         // Wire a no-op output so $this->line() / $this->warn() don't blow up.
-        $output = new \Symfony\Component\Console\Output\NullOutput();
-        $command->setOutput(new \Illuminate\Console\OutputStyle(
-            new \Symfony\Component\Console\Input\ArrayInput([]),
+        $output = new NullOutput;
+        $command->setOutput(new OutputStyle(
+            new ArrayInput([]),
             $output
         ));
 

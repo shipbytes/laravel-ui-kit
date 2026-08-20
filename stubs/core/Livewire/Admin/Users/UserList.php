@@ -27,7 +27,7 @@ class UserList extends Component
             ->when($this->search !== '', function ($q) {
                 $q->where(function ($inner) {
                     $inner->where('name', 'like', "%{$this->search}%")
-                          ->orWhere('email', 'like', "%{$this->search}%");
+                        ->orWhere('email', 'like', "%{$this->search}%");
                 });
             })
             ->latest()

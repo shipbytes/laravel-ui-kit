@@ -47,6 +47,10 @@ class TicketDetail extends Component
 
     public function updateStatus(): void
     {
+        $this->validate([
+            'newStatus' => ['required', 'in:open,in_progress,resolved,closed'],
+        ]);
+
         if ($this->newStatus === $this->ticket->status) {
             return;
         }
@@ -60,6 +64,10 @@ class TicketDetail extends Component
 
     public function updatePriority(): void
     {
+        $this->validate([
+            'newPriority' => ['required', 'in:low,medium,high'],
+        ]);
+
         if ($this->newPriority === $this->ticket->priority) {
             return;
         }

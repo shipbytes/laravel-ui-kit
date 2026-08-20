@@ -2,8 +2,8 @@
 
 namespace Shipbytes\UiKit\Console;
 
-use Shipbytes\UiKit\Support\ModuleRegistry;
 use Illuminate\Console\Command;
+use Shipbytes\UiKit\Support\ModuleRegistry;
 
 class ListModulesCommand extends Command
 {
@@ -18,11 +18,6 @@ class ListModulesCommand extends Command
         foreach ($registry->all() as $slug => $meta) {
             $installed = $registry->isInstalled($slug);
             $status = $installed ? '<info>installed</info>' : '<comment>available</comment>';
-
-            if (! empty($meta['providers'])) {
-                $enabled = config("ui-kit.installed_modules.{$slug}", []);
-                $status .= ' ('.(empty($enabled) ? 'no providers' : implode(', ', $enabled)).')';
-            }
 
             $rows[] = [$slug, $meta['label'], $status];
         }

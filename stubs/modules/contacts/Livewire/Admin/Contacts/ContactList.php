@@ -3,6 +3,8 @@
 namespace App\Livewire\Admin\Contacts;
 
 use App\Models\ContactSubmission;
+use App\Models\SupportTicket;
+use App\Models\TicketReply;
 use App\Models\User;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -175,7 +177,7 @@ class ContactList extends Component
 
     public function copyToTicket(int $id): void
     {
-        if (! class_exists(\App\Models\SupportTicket::class) || ! class_exists(\App\Models\TicketReply::class)) {
+        if (! class_exists(SupportTicket::class) || ! class_exists(TicketReply::class)) {
             session()->flash('error', 'Install the support-tickets module to use this action.');
 
             return;
@@ -190,7 +192,7 @@ class ContactList extends Component
             return;
         }
 
-        $ticket = \App\Models\SupportTicket::create([
+        $ticket = SupportTicket::create([
             'user_id' => $user->id,
             'subject' => $submission->subject,
             'category' => 'general',
@@ -198,7 +200,7 @@ class ContactList extends Component
             'status' => 'open',
         ]);
 
-        \App\Models\TicketReply::create([
+        TicketReply::create([
             'ticket_id' => $ticket->id,
             'user_id' => $user->id,
             'message' => $submission->message,
@@ -206,7 +208,7 @@ class ContactList extends Component
         ]);
 
         if ($submission->reply) {
-            \App\Models\TicketReply::create([
+            TicketReply::create([
                 'ticket_id' => $ticket->id,
                 'user_id' => auth()->id(),
                 'message' => $submission->reply,
@@ -235,7 +237,7 @@ class ContactList extends Component
 
     public function supportTicketsInstalled(): bool
     {
-        return class_exists(\App\Models\SupportTicket::class);
+        return class_exists(SupportTicket::class);
     }
 
     public function render()

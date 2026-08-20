@@ -2,6 +2,15 @@
 
 namespace Shipbytes\UiKit;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Livewire\Volt\Volt;
+use Shipbytes\UiKit\Console\DoctorCommand;
 use Shipbytes\UiKit\Console\InstallCommand;
 use Shipbytes\UiKit\Console\InstallModuleCommand;
 use Shipbytes\UiKit\Console\ListModulesCommand;
@@ -10,10 +19,6 @@ use Shipbytes\UiKit\Support\ModuleRegistry;
 use Shipbytes\UiKit\Support\NullBadgeResolver;
 use Shipbytes\UiKit\View\Components\UiKitBanners;
 use Shipbytes\UiKit\View\Components\UiKitHead;
-use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\ServiceProvider;
-use Livewire\Volt\Volt;
 
 class UiKitServiceProvider extends ServiceProvider
 {
@@ -23,13 +28,13 @@ class UiKitServiceProvider extends ServiceProvider
 
         $this->app->singleton(ModuleRegistry::class);
         $this->app->bind(SidebarBadgeResolver::class, NullBadgeResolver::class);
-
-        $this->seedAnalyticsConfigDefaults();
     }
 
     public function boot(): void
     {
-        $this->loadViewsFrom(__DIR__.'/../stubs/core/views', 'ui-kit');
+        // Package-namespace views (ui-kit::…) live in resources/views and are
+        // NOT published — consumers override them via views/vendor/ui-kit/.
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'ui-kit');
 
         Blade::component('ui-kit::head', UiKitHead::class);
         Blade::component('ui-kit::banners', UiKitBanners::class);
@@ -39,48 +44,57 @@ class UiKitServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 InstallModuleCommand::class,
                 ListModulesCommand::class,
+                DoctorCommand::class,
             ]);
 
             $this->registerPublishers();
         }
 
         $this->registerRoutes();
-        $this->registerUtmMiddleware();
+        $this->registerRateLimiters();
         $this->registerVoltMountPaths();
     }
 
     /**
-     * Read GA4 / PostHog values from .env and inject them into config/services
-     * at runtime, so consumers don't have to edit config/services.php.
-     *
-     * If a consumer has set the keys explicitly in services.php, those win —
-     * we only fill in when the slot is empty.
+     * Fortify's POST endpoints are registered with 'throttle:login' and
+     * 'throttle:two-factor', but a fresh app never defines those named
+     * limiters — any direct hit on them would throw (and go unthrottled).
+     * Register sane defaults unless the app already did.
      */
-    protected function seedAnalyticsConfigDefaults(): void
+    protected function registerRateLimiters(): void
     {
-        $current = $this->app['config']->get('services', []);
+        if (RateLimiter::limiter('login') === null) {
+            RateLimiter::for('login', function (Request $request) {
+                $email = Str::transliterate(Str::lower((string) $request->input('email')));
 
-        $current['google'] ??= [];
-        $current['google']['analytics_id'] = $current['google']['analytics_id']
-            ?? env('GOOGLE_ANALYTICS_ID');
+                return Limit::perMinute(5)->by($email.'|'.$request->ip());
+            });
+        }
 
-        $current['posthog'] ??= [];
-        $current['posthog']['public_key'] = $current['posthog']['public_key']
-            ?? env('POSTHOG_PUBLIC_KEY');
-        $current['posthog']['host'] = $current['posthog']['host']
-            ?? env('POSTHOG_HOST', 'https://us.i.posthog.com');
-
-        $this->app['config']->set('services', $current);
+        if (RateLimiter::limiter('two-factor') === null) {
+            RateLimiter::for('two-factor', function (Request $request) {
+                return Limit::perMinute(5)->by(
+                    ($request->session()->get('login.id') ?? $request->ip()).'|'.$request->ip()
+                );
+            });
+        }
     }
 
     /**
      * Load the kit's published route files automatically so host apps don't
-     * need to edit bootstrap/app.php. If a consumer wants to disable this
-     * (e.g. to fully customize routing), just delete the relevant route file —
-     * the provider no-ops when they aren't present.
+     * need to edit bootstrap/app.php.
+     *
+     * Only files carrying the "ui-kit:managed" header are loaded — a
+     * routes/auth.php that predates the kit (Breeze, hand-rolled) is left
+     * alone so it never gets registered twice. Consumers opt out by deleting
+     * the header line (or the file).
      */
     protected function registerRoutes(): void
     {
+        if ($this->app->routesAreCached()) {
+            return;
+        }
+
         $files = [
             base_path('routes/auth.php'),
             base_path('routes/admin.php'),
@@ -88,33 +102,18 @@ class UiKitServiceProvider extends ServiceProvider
         ];
 
         foreach ($files as $file) {
-            if (file_exists($file)) {
-                Route::middleware('web')->group($file);
+            if (! file_exists($file)) {
+                continue;
             }
+
+            $contents = (string) file_get_contents($file);
+
+            if (! str_contains($contents, 'ui-kit:managed')) {
+                continue;
+            }
+
+            Route::middleware('web')->group($file);
         }
-    }
-
-    /**
-     * If the analytics:utm provider was installed, push the kit's
-     * CaptureUtmParameters middleware into the web group at runtime.
-     * Removes the manual bootstrap/app.php edit step.
-     */
-    protected function registerUtmMiddleware(): void
-    {
-        $installed = config('ui-kit.installed_modules', []);
-        $utmInstalled = in_array('utm', $installed['analytics'] ?? [], true);
-
-        if (! $utmInstalled) {
-            return;
-        }
-
-        $class = '\\App\\Http\\Middleware\\CaptureUtmParameters';
-
-        if (! class_exists($class)) {
-            return;
-        }
-
-        Route::pushMiddlewareToGroup('web', $class);
     }
 
     protected function registerPublishers(): void
@@ -137,6 +136,7 @@ class UiKitServiceProvider extends ServiceProvider
         $this->publishes([
             $core.'/js/ui-kit.js' => resource_path('js/ui-kit.js'),
             $core.'/css/ui-kit.css' => resource_path('css/ui-kit.css'),
+            $core.'/css/ui-kit-theme.css' => resource_path('css/ui-kit-theme.css'),
         ], 'ui-kit-assets');
 
         $this->publishes([
@@ -146,9 +146,23 @@ class UiKitServiceProvider extends ServiceProvider
         ], 'ui-kit-routes');
 
         $this->publishes([
-            $core.'/migrations/2024_01_01_000000_add_is_admin_to_users_table.php'
-                => database_path('migrations/'.date('Y_m_d_His').'_add_is_admin_to_users_table.php'),
+            $core.'/migrations/2024_01_01_000000_add_is_admin_to_users_table.php' => $this->migrationTarget('add_is_admin_to_users_table'),
         ], 'ui-kit-migrations');
+    }
+
+    /**
+     * Reuse the filename of an already-published copy of a kit migration so
+     * repeated installs don't accumulate freshly-timestamped duplicates.
+     */
+    protected function migrationTarget(string $name): string
+    {
+        $existing = glob(database_path("migrations/*_{$name}.php")) ?: [];
+
+        if ($existing !== []) {
+            return $existing[0];
+        }
+
+        return database_path('migrations/'.date('Y_m_d_His')."_{$name}.php");
     }
 
     protected function registerVoltMountPaths(): void

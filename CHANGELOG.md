@@ -10,112 +10,121 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-04-24
+## [0.1.0] - 2026-08-20
 
-Initial public release. Contents updated in place during early iteration.
+Initial public release. Contents updated in place during early iteration —
+the 2026-08-20 revision is a **scope reset** following a full audit.
 
-### Core
-- **Core scaffold** installed by `php artisan ui-kit:install`: Livewire + Volt
-  auth pages (login, register, forgot/reset password, email verification,
-  confirm password), admin shell with collapsible sidebar and mobile bottom
-  nav, dashboard stub, Users CRUD, Tailwind preset, Alpine stores for
-  sidebar + theme.
-- **Module installer** (`ui-kit:install-module {slug}`) + listing command
-  (`ui-kit:list-modules`).
-- **9 optional modules**:
-  - `admin-middleware` — Spatie Permissions wiring with `is_admin` fallback.
-  - `support-tickets` — admin ticket queue with replies and status filters.
-  - `changelog` — admin-authored changelog entries with public feed helper.
-  - `contacts` — inbox for public contact-form submissions, with
-    auto-appearing "Copy to Ticket" button when `support-tickets` is present.
-  - `analytics` — pluggable UTM / GA4 / PostHog providers, consent-gated.
-  - `profile` — self-service name/email/password/avatar cards + 2FA toggle.
-  - `impersonation` — login-as-user over `lab404/laravel-impersonate`.
-  - `activity-log` — admin viewer over `spatie/laravel-activitylog`.
-  - `dark-mode` — theme toggle component + no-flash snippet.
-- **Sidebar badge contract** (`SidebarBadgeResolver`) so host apps can bind
-  their own count resolvers.
-- **CI matrix** covering PHP 8.1–8.4 × Laravel 10/11/12 with lint + phpunit.
+### Scope reset (2026-08-20) — breaking
 
-### Installer safety
-- **Preflight auth-scaffold detection** in `ui-kit:install` — aborts on
-  Jetstream, warns + confirms on Breeze or stray auth files
-  (`routes/auth.php`, `app/Livewire/Forms/LoginForm.php`,
-  `resources/views/livewire/pages/auth/*`). Non-interactive runs abort
-  unless `--force` is passed.
-- **Module + provider pickers use plain STDIN** (numbered list +
-  comma-separated input). Avoids Laravel Prompts' multiselect, which
-  rendered invisibly on Windows cmd / Laragon / some WSL emulators. Other
-  Prompts calls (`confirm`, `info`, `note`) auto-fall-back via
-  `UI_KIT_PROMPTS_FALLBACK=0|1`.
+- **Laravel 12+ only.** Constraints are now `php: ^8.2`,
+  `illuminate/*: ^12 || ^13`, `laravel/fortify: ^1.25`,
+  `laravel/prompts: ^0.3`, `livewire/livewire: ^3.6`, `livewire/volt: ^1.7`,
+  `propaganistas/laravel-disposable-email: ^2.4`. Laravel 10/11 support
+  removed.
+- **Analytics module removed** (UTM tracking, GA4, PostHog) along with the
+  provider-picker machinery, npm-install deferral, and the runtime
+  services-config / UTM-middleware wiring.
+- **Tailwind CSS v4 native.** `tailwind-preset.js` is gone; the kit ships a
+  CSS-first `@theme` token file (`ui-kit-theme.css`) plus a
+  `@custom-variant` binding `dark:` to the kit's class strategy. The
+  `@tailwindcss/forms` dependency is gone (native controls styled via
+  `accent-color`).
+- **dark-mode module folded into core** — `<x-theme-toggle />` ships in core
+  and the admin shell header includes it.
+- **Socialite feature flag + social-buttons partial removed** (they pointed
+  at routes that never existed).
 
-### Turnkey installer (auto-patching, runtime wiring)
-The post-install checklist drops from ~30 manual steps across 9 files to
-**5 small steps** in 2 files (User model + master layout) plus an `.env`
-and an `assignRole`. Everything else is automated.
+### Fixed (2026-08-20 audit)
 
-- **Auto-patches `config/admin.php`** between `/* ui-kit:nav-start */` and
-  `/* ui-kit:nav-end */` markers — modules' nav entries are merged in
-  idempotently (dedup by route name).
-- **Auto-patches `routes/admin.php`** between `/* ui-kit:admin-routes-* */`
-  markers — modules' admin routes are appended idempotently.
-- **`admin-middleware`** auto-swaps the middleware in `config/admin.php`
-  from the fallback to `App\Http\Middleware\EnsureUserIsAdmin::class`.
-- **Auto-Fortify configuration** — publishes `config/fortify.php` and
-  flips `views` to `false` so Fortify's default view routes don't collide
-  with the kit's Volt pages. Prevents `/register` 500 with
-  "RegisterViewResponse is not instantiable" on fresh installs.
-- **New `routes/ui-kit-user.php`** auto-loaded by the service provider.
-  Houses authenticated user-side routes (e.g. `/profile`). No need to
-  edit `routes/web.php`.
-- **Auto-loaded routes** — `UiKitServiceProvider` wires `routes/auth.php`,
-  `routes/admin.php`, and `routes/ui-kit-user.php` into the host app
-  automatically when they exist. No `bootstrap/app.php` edit needed.
-- **Generated `App\Models\Concerns\UiKitUser` trait** that bundles
-  Spatie `HasRoles` + lab404 `Impersonate` + `canImpersonate` /
-  `canBeImpersonated`, conditionally based on which modules you actually
-  installed. You add `use UiKitUser;` to your User model — one line
-  instead of two traits + two methods.
-- **`<x-ui-kit::head />`** Blade component bundling dark-mode no-flash +
-  GA4 + PostHog `@includes`. One tag in your `<head>`.
-- **`<x-ui-kit::banners />`** Blade component for the impersonation
-  ribbon (and any future kit-shipped banners).
-- **Auto-installed dependencies** via `vendor:publish` for every kit
-  module that needs it: Spatie Permission, mews/purifier,
-  lab404/laravel-impersonate, Spatie Activitylog. Plus
-  `php artisan storage:link` for the profile module and
-  `npm install posthog-js` for the analytics:posthog provider.
-- **Auto-runs** `php artisan migrate` (one shot, covering kit + module +
-  Spatie published migrations) and `db:seed AdminRoleSeeder` once at the
-  end of install.
-- **Runtime `services.php` config** — `UiKitServiceProvider` reads
-  `GOOGLE_ANALYTICS_ID` / `POSTHOG_PUBLIC_KEY` / `POSTHOG_HOST` from
-  `.env` and seeds `services.google.*` + `services.posthog.*` at boot.
-  No `config/services.php` edit needed.
-- **Runtime UTM middleware registration** — when `analytics:utm` is
-  installed, the SP pushes `CaptureUtmParameters` to the `web` middleware
-  group automatically. No `bootstrap/app.php` edit.
+- Fresh installs no longer 500 on every core page: `route('home')` calls were
+  replaced by `UiKit::homeUrl()`, which falls back to `/` when the configured
+  home route doesn't exist (guest layout, admin sidebar, all auth redirects,
+  email verification, profile).
+- The generated `UiKitUser` trait is now written **in the same process** that
+  installs the modules (installed-module state syncs to the runtime config).
+- `markInstalled()` no longer round-trips `config/ui-kit.php` through
+  `var_export` — `env()` defaults and comments survive; only the slug list
+  between `/* ui-kit:modules-* */` markers is patched.
+- The service provider only auto-loads route files carrying the
+  `// ui-kit:managed` header — pre-existing Breeze or hand-rolled
+  `routes/auth.php` files are never double-registered (this used to break
+  `route:cache` the moment the package was required).
+- `patchAdminNav` preserved only the newest module's entries — installing a
+  second nav-declaring module wiped the first one's sidebar entry. Fixed and
+  regression-tested.
+- Deferred install commands (storage:link, seeders, vendor publishes) lived
+  in **trait statics**, which PHP copies per using class — module-registered
+  deferrals never reached the parent installer's drain, so `storage:link`
+  and `AdminRoleSeeder` silently never ran on `ui-kit:install`. Queue moved
+  to a shared `InstallQueue` class.
+- Re-running `ui-kit:install` no longer trips the Breeze-collision preflight
+  on the kit's own files: a kit-managed install is detected and the run
+  switches to update mode (non-interactive re-runs now succeed).
+- `config/fortify.php` patching extended: `views=false` (as before), plus
+  `home => /` (Fortify's `/home` default doesn't exist on fresh apps) and
+  the passkeys feature commented out (the kit ships no passkey UI).
+- The kit's `verification.verify` route yields to Fortify's when the
+  `emailVerification` feature is enabled (duplicate names broke
+  `route:cache`).
+- The core `is_admin` migration publish reuses an existing filename instead
+  of stamping a new duplicate on every re-install; Fortify's (unguarded)
+  2FA migration publish is glob-guarded the same way.
+- Avatar uploads derive the file extension from the actual MIME type instead
+  of the client filename (a JPEG/PHP polyglot could previously land as
+  `avatars/1.php` on the public disk).
+- Support ticket status/priority updates are validated against allowlists.
+- `--modules=all` works; unknown module slugs abort with exit 1 instead of
+  silently continuing.
+- `composer` is resolved via `ExecutableFinder` (Windows `composer.bat`).
+- The activity-log nav icon (`clock`) actually exists; Poppins/Montserrat
+  fonts referenced by the theme are actually loaded.
 
-### Module metadata
-- `ModuleRegistry` modules declare structured fields (`admin_routes`,
-  `admin_nav`, `user_routes`, `admin_middleware_swap`, `artisan_publish`,
-  `artisan_seed`, `storage_link`, `npm`, plus per-provider `providers_meta`)
-  instead of free-text post-install notes for everything. Residual
-  `post_install_notes` remain for genuinely-manual steps (e.g. assigning
-  the admin role).
-- Final installer output is one consolidated summary instead of a
-  per-module checklist dump. Suppressed when `--from-parent` runs the
-  module command on behalf of `ui-kit:install`.
+### Added (2026-08-20)
 
-### Tests
-- **Idempotency tests** under `tests/Feature/PatchingIdempotencyTest.php`
-  assert nav / admin-routes / user-routes / middleware-swap don't
-  duplicate on re-run.
+- **Working two-factor authentication end to end**: Fortify's 2FA columns
+  are published and migrated by the installer; the generated `UiKitUser`
+  trait bundles `TwoFactorAuthenticatable` when the profile module is
+  installed; the profile 2FA card gates on
+  `Features::canManageTwoFactorAuthentication()` and supports Fortify's
+  confirm flow (enable → QR → confirm code → recovery codes) via Fortify's
+  own actions; `LoginForm` stages a challenge and the new
+  `/two-factor-challenge` Volt page (TOTP + recovery code, rate limited)
+  completes authentication.
+- **`ui-kit:doctor`** — health check with fix hints: published files,
+  managed route headers, Fortify flags, Vite imports, trait applied,
+  storage link, 2FA columns, duplicate route names, mail config.
+- **`layouts/user-shell.blade.php`** — light authenticated layout (brand
+  bar, admin link for admins, theme toggle, logout); `/profile` renders
+  there instead of inside the admin shell.
+- **Logout everywhere it was missing**: admin sidebar footer gains a
+  current-user row with profile link + logout (posting to Fortify's
+  always-registered `logout` route).
+- **Vite auto-wiring**: the installer adds the kit's CSS/JS imports to
+  `resources/css/app.css` / `resources/js/app.js` idempotently.
+- **Rate limiting**: registration (10/hour/IP), the 2FA challenge, and
+  defensive `login` / `two-factor` named limiters for Fortify's own POST
+  endpoints (which referenced limiters no fresh app defines).
+- **Dark mode across the guest/auth pages** (previously admin-only), with
+  the no-flash snippet included by every kit layout.
+- **Model factories** for SupportTicket, TicketReply, ChangelogEntry,
+  ContactSubmission.
+- **Brand-mark fallback** — layouts render an initial badge until a logo
+  file exists.
+- **Tooling**: Pint + Larastan (level 5) clean and enforced in CI; a
+  fresh-Laravel-12 end-to-end CI job (path-repo install, `--modules=all`,
+  npm build, `route:cache`, doctor, HTTP smoke); an in-repo end-to-end
+  installer test plus HTTP render tests for the published pages.
 
-### Known limitations
-- Laravel 13 is not yet in CI — peer-dep readiness across Fortify / Spatie
-  is still landing. The kit is expected to work on L13; bump `composer.json`
-  locally to try.
+### Core (unchanged highlights)
+
+- `ui-kit:install` / `ui-kit:install-module {slug}` / `ui-kit:list-modules`
+  with plain-STDIN pickers (reliable on Windows/WSL terminals).
+- 7 optional modules: admin-middleware, support-tickets, changelog,
+  contacts, profile, impersonation, activity-log.
+- Marker-based idempotent patching of `config/admin.php`,
+  `routes/admin.php`, `routes/ui-kit-user.php`.
+- `SidebarBadgeResolver` contract for host-app badge counts.
 
 [Unreleased]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/shipbytes/laravel-ui-kit/releases/tag/v0.1.0

@@ -2,11 +2,11 @@
 
 namespace Shipbytes\UiKit\Console;
 
-use Shipbytes\UiKit\Console\Concerns\InstallsModule;
-use Shipbytes\UiKit\Support\ModuleRegistry;
 use Composer\InstalledVersions;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use Shipbytes\UiKit\Console\Concerns\InstallsModule;
+use Shipbytes\UiKit\Support\ModuleRegistry;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
@@ -20,7 +20,7 @@ class InstallCommand extends Command
 
     protected $signature = 'ui-kit:install
                             {--force : Overwrite existing files without prompting}
-                            {--modules= : Comma-separated module slugs to install non-interactively}';
+                            {--modules= : Comma-separated module slugs (or "all") to install non-interactively}';
 
     protected $description = 'Install the UI Kit core and optionally pick modules interactively.';
 
@@ -39,28 +39,29 @@ class InstallCommand extends Command
 
         $this->publishCore();
         $this->configureFortify();
+        $this->patchViteEntrypoints();
+
+        // Fortify's two_factor_* columns back the profile module's 2FA card
+        // and the login challenge. Publish once — the migration isn't
+        // guarded, so a re-published copy would fail on migrate.
+        if ((glob(database_path('migrations/*_add_two_factor_columns_to_users_table.php')) ?: []) === []) {
+            $this->deferVendorPublish(['--tag' => 'fortify-migrations']);
+        }
 
         // The kit ships at least one core migration (add_is_admin_to_users_table).
         $this->deferMigrate();
 
         $selected = $this->resolveSelectedModules($registry);
 
+        if ($selected === null) {
+            return self::FAILURE;
+        }
+
         foreach ($selected as $slug) {
-            $args = [
+            $this->call('ui-kit:install-module', [
                 'module' => $slug,
                 '--from-parent' => true,
-            ];
-
-            // Pass through provider selection for analytics so non-interactive
-            // installs work without a second prompt.
-            if ($slug === 'analytics' && $this->option('modules') !== null) {
-                // Default to all providers when invoking non-interactively with
-                // --modules=all etc. Users can still pin specific ones via
-                // --providers when running ui-kit:install-module directly.
-                $args['--providers'] = 'utm,ga4,posthog';
-            }
-
-            $this->call('ui-kit:install-module', $args);
+            ]);
         }
 
         $this->newLine();
@@ -87,7 +88,8 @@ class InstallCommand extends Command
         $this->newLine();
 
         $needsUserTrait = in_array('admin-middleware', $selected, true)
-            || in_array('impersonation', $selected, true);
+            || in_array('impersonation', $selected, true)
+            || in_array('profile', $selected, true);
 
         $step = 1;
 
@@ -103,7 +105,7 @@ class InstallCommand extends Command
 
         $this->line("  <fg=yellow>{$step}.</> Add the kit's component tags to your master layout (<info>resources/views/layouts/app.blade.php</info>):");
         $this->line('       <fg=gray>&lt;head&gt;</>');
-        $this->line('       <fg=gray>    &lt;x-ui-kit::head /&gt;       <!-- analytics + dark-mode no-flash --&gt;</>');
+        $this->line('       <fg=gray>    &lt;x-ui-kit::head /&gt;       <!-- dark-mode no-flash --&gt;</>');
         $this->line('       <fg=gray>&lt;/head&gt;</>');
         $this->line('       <fg=gray>&lt;body&gt;</>');
         $this->line('       <fg=gray>    &lt;x-ui-kit::banners /&gt;    <!-- impersonation ribbon --&gt;</>');
@@ -113,10 +115,6 @@ class InstallCommand extends Command
 
         $this->line("  <fg=yellow>{$step}.</> Set <info>.env</info> keys for the features you enabled:");
         $this->line('       <fg=gray>MAIL_*</>           required for password reset / verification');
-        if (in_array('analytics', $selected, true)) {
-            $this->line('       <fg=gray>GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX</>   (analytics:ga4)');
-            $this->line('       <fg=gray>POSTHOG_PUBLIC_KEY=phc_…</>            (analytics:posthog)');
-        }
         $this->newLine();
         $step++;
 
@@ -139,11 +137,6 @@ class InstallCommand extends Command
             foreach ((array) ($meta['post_install_notes'] ?? []) as $note) {
                 $residual[] = "<fg=gray>[{$slug}]</> {$note}";
             }
-            foreach ((array) ($meta['providers_meta'] ?? []) as $provider => $pMeta) {
-                foreach ((array) ($pMeta['post_install_notes'] ?? []) as $note) {
-                    $residual[] = "<fg=gray>[{$slug}:{$provider}]</> {$note}";
-                }
-            }
         }
 
         if (! empty($residual)) {
@@ -155,6 +148,49 @@ class InstallCommand extends Command
         }
 
         $this->line('<fg=gray>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</>');
+    }
+
+    /**
+     * Wire the kit's CSS/JS into the app's Vite entrypoints so no manual
+     * import edits are needed. Idempotent — skips when already wired.
+     *
+     * The CSS import goes right after `@import 'tailwindcss';` because the
+     * kit's @theme / @custom-variant blocks must follow Tailwind's base
+     * import in the final bundle.
+     */
+    protected function patchViteEntrypoints(): void
+    {
+        $css = resource_path('css/app.css');
+
+        if (file_exists($css)) {
+            $contents = file_get_contents($css);
+
+            if (! str_contains($contents, 'ui-kit.css')) {
+                if (preg_match("/^@import\s+['\"]tailwindcss['\"].*$/m", $contents, $m)) {
+                    $contents = str_replace($m[0], $m[0]."\n@import './ui-kit.css';", $contents);
+                } else {
+                    $contents = rtrim($contents, "\n")."\n@import './ui-kit.css';\n";
+                }
+
+                file_put_contents($css, $contents);
+                $this->line("  ✓ patched <info>resources/css/app.css</info> <comment>@import './ui-kit.css'</comment>");
+            }
+        } else {
+            warning("resources/css/app.css not found — add `@import './ui-kit.css';` to your Tailwind entry CSS yourself.");
+        }
+
+        $js = resource_path('js/app.js');
+
+        if (file_exists($js)) {
+            $contents = file_get_contents($js);
+
+            if (! str_contains($contents, './ui-kit')) {
+                file_put_contents($js, rtrim($contents, "\n")."\nimport './ui-kit';\n");
+                $this->line("  ✓ patched <info>resources/js/app.js</info> <comment>import './ui-kit'</comment>");
+            }
+        } else {
+            warning("resources/js/app.js not found — add `import './ui-kit';` to your JS entry yourself.");
+        }
     }
 
     protected function publishCore(): void
@@ -205,21 +241,37 @@ class InstallCommand extends Command
         }
 
         $contents = file_get_contents($path);
+        $patched = $contents;
 
-        if (str_contains($contents, "'views' => true")) {
-            file_put_contents($path, str_replace("'views' => true", "'views' => false", $contents));
+        if (str_contains($patched, "'views' => true")) {
+            $patched = str_replace("'views' => true", "'views' => false", $patched);
             $this->line('  ✓ patched <info>fortify.php</info> <comment>views=false</comment> (kit supplies its own auth routes)');
-
-            return;
-        }
-
-        if (str_contains($contents, "'views' => false")) {
+        } elseif (str_contains($patched, "'views' => false")) {
             $this->line('  ✓ <info>fortify.php</info> already has views=false');
-
-            return;
+        } else {
+            warning("Couldn't find a `views` flag in config/fortify.php. Set it to false manually so Fortify doesn't collide with the kit's auth routes.");
         }
 
-        warning("Couldn't find a `views` flag in config/fortify.php. Set it to false manually so Fortify doesn't collide with the kit's auth routes.");
+        // Fortify's default 'home' (/home) doesn't exist on a fresh app and
+        // is where Fortify-driven redirects (e.g. after a 2FA challenge)
+        // land. Point it at the app root instead.
+        if (str_contains($patched, "'home' => '/home'")) {
+            $patched = str_replace("'home' => '/home'", "'home' => '/'", $patched);
+            $this->line('  ✓ patched <info>fortify.php</info> <comment>home=/</comment>');
+        }
+
+        // The kit ships no passkey UI; leaving the feature on registers
+        // passkey endpoints that can only error. Comment it out (consumers
+        // who build their own UI can re-enable it).
+        if (str_contains($patched, 'Features::passkeys()')
+            && ! str_contains($patched, '// Features::passkeys()')) {
+            $patched = str_replace('Features::passkeys()', '// Features::passkeys()', $patched);
+            $this->line('  ✓ patched <info>fortify.php</info> <comment>passkeys feature off</comment> (kit ships no passkey UI)');
+        }
+
+        if ($patched !== $contents) {
+            file_put_contents($path, $patched);
+        }
     }
 
     /**
@@ -231,6 +283,18 @@ class InstallCommand extends Command
     {
         $hasJetstream = $this->composerHas('laravel/jetstream');
         $hasBreeze = $this->composerHas('laravel/breeze');
+
+        // A routes/auth.php carrying the kit's managed header means we
+        // published it — this run is an update, not a collision with foreign
+        // auth scaffolding. Skip the warnings so re-runs stay non-interactive.
+        $authFile = base_path('routes/auth.php');
+        if (! $hasJetstream && ! $hasBreeze
+            && file_exists($authFile)
+            && str_contains((string) file_get_contents($authFile), 'ui-kit:managed')) {
+            note('Existing UI Kit install detected — updating in place. Existing files are kept unless --force is passed.');
+
+            return null;
+        }
 
         $fileCollisions = array_values(array_filter([
             'routes/auth.php',
@@ -297,18 +361,26 @@ class InstallCommand extends Command
     }
 
     /**
-     * @return array<int, string>
+     * Resolve which modules to install. Returns null on invalid input so the
+     * caller can abort with a failure exit code.
+     *
+     * @return array<int, string>|null
      */
-    protected function resolveSelectedModules(ModuleRegistry $registry): array
+    protected function resolveSelectedModules(ModuleRegistry $registry): ?array
     {
         if ($this->option('modules') !== null) {
             $requested = array_filter(array_map('trim', explode(',', (string) $this->option('modules'))));
+
+            if ($requested === ['all']) {
+                return array_keys($registry->all());
+            }
+
             $unknown = array_diff($requested, array_keys($registry->all()));
 
             if (! empty($unknown)) {
-                $this->error('Unknown modules: '.implode(', ', $unknown));
+                $this->error('Unknown modules: '.implode(', ', $unknown).'. Available: all, '.implode(', ', array_keys($registry->all())));
 
-                return [];
+                return null;
             }
 
             return array_values($requested);

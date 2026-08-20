@@ -13,7 +13,7 @@
             <livewire:profile.update-password-form />
         </div>
 
-        @if(class_exists(\Laravel\Fortify\Actions\EnableTwoFactorAuthentication::class))
+        @if(\Laravel\Fortify\Features::canManageTwoFactorAuthentication() && method_exists(auth()->user(), 'hasEnabledTwoFactorAuthentication'))
         <div class="p-4 sm:p-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm ring-1 ring-zinc-950/5 dark:ring-white/10">
             <livewire:profile.two-factor-authentication-form />
         </div>

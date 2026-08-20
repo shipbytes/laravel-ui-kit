@@ -11,10 +11,12 @@ class ModuleRegistryTest extends TestCase
     {
         $expected = [
             'admin-middleware', 'support-tickets', 'changelog', 'contacts',
-            'analytics', 'profile', 'impersonation', 'activity-log', 'dark-mode',
+            'profile', 'impersonation', 'activity-log',
         ];
 
         $registry = $this->app->make(ModuleRegistry::class);
+
+        $this->assertSame($expected, array_keys($registry->all()));
 
         foreach ($expected as $slug) {
             $this->assertTrue($registry->has($slug), "Module {$slug} should be registered");
@@ -33,14 +35,6 @@ class ModuleRegistryTest extends TestCase
         foreach (array_keys($registry->all()) as $slug) {
             $this->assertDirectoryExists($base.'/'.$slug, "Expected stubs/modules/{$slug} to exist");
         }
-    }
-
-    public function test_analytics_has_expected_providers(): void
-    {
-        $registry = $this->app->make(ModuleRegistry::class);
-        $analytics = $registry->get('analytics');
-
-        $this->assertSame(['utm', 'ga4', 'posthog'], $analytics['providers']);
     }
 
     public function test_unknown_module_throws(): void
