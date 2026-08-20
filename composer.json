@@ -1,6 +1,6 @@
 {
     "name": "shipbytes/laravel-ui-kit",
-    "description": "Admin panel + auth UI kit for Laravel with Livewire 3, Volt, and Tailwind. Modular installers for optional features.",
+    "description": "Admin panel + auth UI kit for Laravel 12+ with Livewire 3, Volt, and Tailwind 4. Modular installers for optional features.",
     "type": "library",
     "license": "MIT",
     "keywords": ["laravel", "livewire", "volt", "admin", "auth", "tailwind", "ui-kit"],
@@ -16,20 +16,20 @@
         }
     ],
     "require": {
-        "php": "^8.1",
-        "illuminate/support": "^10.0 || ^11.0 || ^12.0 || ^13.0",
-        "illuminate/console": "^10.0 || ^11.0 || ^12.0 || ^13.0",
-        "illuminate/view": "^10.0 || ^11.0 || ^12.0 || ^13.0",
-        "illuminate/routing": "^10.0 || ^11.0 || ^12.0 || ^13.0",
-        "laravel/fortify": "^1.21",
-        "laravel/prompts": "^0.1.15 || ^0.2.0 || ^0.3.0",
-        "livewire/livewire": "^3.0",
-        "livewire/volt": "^1.0",
-        "propaganistas/laravel-disposable-email": "^2.0"
+        "php": "^8.2",
+        "illuminate/support": "^12.0 || ^13.0",
+        "illuminate/console": "^12.0 || ^13.0",
+        "illuminate/view": "^12.0 || ^13.0",
+        "illuminate/routing": "^12.0 || ^13.0",
+        "laravel/fortify": "^1.25",
+        "laravel/prompts": "^0.3.0",
+        "livewire/livewire": "^3.6",
+        "livewire/volt": "^1.7",
+        "propaganistas/laravel-disposable-email": "^2.4"
     },
     "require-dev": {
-        "orchestra/testbench": "^8.0 || ^9.0 || ^10.0",
-        "phpunit/phpunit": "^10.5 || ^11.0"
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "phpunit/phpunit": "^11.5 || ^12.0"
     },
     "suggest": {
         "spatie/laravel-permission": "Required when installing the admin-middleware module",

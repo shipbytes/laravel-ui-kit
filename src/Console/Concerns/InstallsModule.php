@@ -5,7 +5,6 @@ namespace Shipbytes\UiKit\Console\Concerns;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Laravel\Prompts\Prompt;
-use Symfony\Component\Process\Process;
 
 trait InstallsModule
 {
@@ -21,9 +20,6 @@ trait InstallsModule
     /** @var array<int, string> */
     protected static array $deferredSeeders = [];
 
-    /** @var array<int, string> */
-    protected static array $deferredNpmPackages = [];
-
     /** @var bool */
     protected static bool $deferredStorageLink = false;
 
@@ -34,7 +30,6 @@ trait InstallsModule
     {
         static::$deferredVendorPublishes = [];
         static::$deferredSeeders = [];
-        static::$deferredNpmPackages = [];
         static::$deferredStorageLink = false;
         static::$deferredMigrate = false;
     }
@@ -498,18 +493,6 @@ PHP;
         }
     }
 
-    /**
-     * @param  array<int, string>  $packages
-     */
-    protected function deferNpmInstall(array $packages): void
-    {
-        foreach ($packages as $pkg) {
-            if (! in_array($pkg, static::$deferredNpmPackages, true)) {
-                static::$deferredNpmPackages[] = $pkg;
-            }
-        }
-    }
-
     protected function deferStorageLink(): void
     {
         static::$deferredStorageLink = true;
@@ -550,43 +533,6 @@ PHP;
             $this->line('  ✓ <info>storage:link</info> created');
         }
 
-        if (! empty(static::$deferredNpmPackages)) {
-            $this->runNpm(static::$deferredNpmPackages);
-        }
-
         $this->resetDeferred();
-    }
-
-    /**
-     * @param  array<int, string>  $packages
-     */
-    protected function runNpm(array $packages): void
-    {
-        if (empty($packages)) {
-            return;
-        }
-
-        $this->line('  · installing npm packages: '.implode(', ', $packages));
-
-        $process = new Process(array_merge(['npm', 'install', '--no-audit', '--no-fund'], $packages), base_path());
-        $process->setTimeout(300);
-
-        try {
-            $process->run(function ($type, $buffer) {
-                $this->output->write($buffer);
-            });
-        } catch (\Throwable $e) {
-            $this->warn('npm install failed: '.$e->getMessage().'. Run `npm install '.implode(' ', $packages).'` yourself.');
-
-            return;
-        }
-
-        if (! $process->isSuccessful()) {
-            $this->warn('npm install exited non-zero. Re-run `npm install '.implode(' ', $packages).'` manually.');
-
-            return;
-        }
-
-        $this->line('  ✓ npm packages installed');
     }
 }

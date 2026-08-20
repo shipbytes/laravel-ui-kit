@@ -23,8 +23,6 @@ class UiKitServiceProvider extends ServiceProvider
 
         $this->app->singleton(ModuleRegistry::class);
         $this->app->bind(SidebarBadgeResolver::class, NullBadgeResolver::class);
-
-        $this->seedAnalyticsConfigDefaults();
     }
 
     public function boot(): void
@@ -45,32 +43,7 @@ class UiKitServiceProvider extends ServiceProvider
         }
 
         $this->registerRoutes();
-        $this->registerUtmMiddleware();
         $this->registerVoltMountPaths();
-    }
-
-    /**
-     * Read GA4 / PostHog values from .env and inject them into config/services
-     * at runtime, so consumers don't have to edit config/services.php.
-     *
-     * If a consumer has set the keys explicitly in services.php, those win —
-     * we only fill in when the slot is empty.
-     */
-    protected function seedAnalyticsConfigDefaults(): void
-    {
-        $current = $this->app['config']->get('services', []);
-
-        $current['google'] ??= [];
-        $current['google']['analytics_id'] = $current['google']['analytics_id']
-            ?? env('GOOGLE_ANALYTICS_ID');
-
-        $current['posthog'] ??= [];
-        $current['posthog']['public_key'] = $current['posthog']['public_key']
-            ?? env('POSTHOG_PUBLIC_KEY');
-        $current['posthog']['host'] = $current['posthog']['host']
-            ?? env('POSTHOG_HOST', 'https://us.i.posthog.com');
-
-        $this->app['config']->set('services', $current);
     }
 
     /**
@@ -92,29 +65,6 @@ class UiKitServiceProvider extends ServiceProvider
                 Route::middleware('web')->group($file);
             }
         }
-    }
-
-    /**
-     * If the analytics:utm provider was installed, push the kit's
-     * CaptureUtmParameters middleware into the web group at runtime.
-     * Removes the manual bootstrap/app.php edit step.
-     */
-    protected function registerUtmMiddleware(): void
-    {
-        $installed = config('ui-kit.installed_modules', []);
-        $utmInstalled = in_array('utm', $installed['analytics'] ?? [], true);
-
-        if (! $utmInstalled) {
-            return;
-        }
-
-        $class = '\\App\\Http\\Middleware\\CaptureUtmParameters';
-
-        if (! class_exists($class)) {
-            return;
-        }
-
-        Route::pushMiddlewareToGroup('web', $class);
     }
 
     protected function registerPublishers(): void

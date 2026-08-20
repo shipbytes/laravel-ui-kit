@@ -19,11 +19,6 @@ class ListModulesCommand extends Command
             $installed = $registry->isInstalled($slug);
             $status = $installed ? '<info>installed</info>' : '<comment>available</comment>';
 
-            if (! empty($meta['providers'])) {
-                $enabled = config("ui-kit.installed_modules.{$slug}", []);
-                $status .= ' ('.(empty($enabled) ? 'no providers' : implode(', ', $enabled)).')';
-            }
-
             $rows[] = [$slug, $meta['label'], $status];
         }
 

@@ -18,8 +18,8 @@ document.addEventListener('alpine:init', () => {
         },
     });
 
-    // Theme store — only meaningful when the dark-mode module is installed,
-    // but safe to register regardless.
+    // Theme store — backs <x-theme-toggle /> and the no-flash snippet in
+    // <x-ui-kit::head />.
     window.Alpine.store('theme', {
         value: localStorage.getItem('ui-kit.theme') || 'light',
         init() {

@@ -27,8 +27,6 @@ new #[Layout('layouts.guest')] class extends Component
         <p class="mt-2 text-sm text-gray-500 font-booktext">{{ config('ui-kit.copy.login.subheading') }}</p>
     </div>
 
-    @include('layouts.partials.social-buttons')
-
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
     <form wire:submit="login" class="space-y-5">

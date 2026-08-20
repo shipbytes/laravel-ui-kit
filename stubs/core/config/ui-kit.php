@@ -60,7 +60,6 @@ return [
 
     'features' => [
         'disposable_email_block' => true,
-        'socialite' => false,
     ],
 
     /*

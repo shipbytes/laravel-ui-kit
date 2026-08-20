@@ -35,17 +35,20 @@
                                 <img src="{{ asset(config('ui-kit.brand.logo')) }}" alt="{{ config('ui-kit.brand.name') }}" class="size-6 shrink-0">
                                 <span x-show="!$store.sidebar.collapsed" class="truncate text-sm font-semibold text-zinc-950 dark:text-zinc-100">Admin</span>
                             </a>
-                            <button
-                                @click="$store.sidebar.toggle()"
-                                type="button"
-                                :title="$store.sidebar.collapsed ? 'Expand' : 'Collapse'"
-                                class="flex items-center justify-center size-7 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors shrink-0"
-                            >
-                                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                    <path d="M9 3v18"/>
-                                </svg>
-                            </button>
+                            <div :class="$store.sidebar.collapsed ? 'flex-col' : 'flex-row'" class="flex items-center gap-0.5 shrink-0">
+                                <x-theme-toggle class="size-7 rounded-md" />
+                                <button
+                                    @click="$store.sidebar.toggle()"
+                                    type="button"
+                                    :title="$store.sidebar.collapsed ? 'Expand' : 'Collapse'"
+                                    class="flex items-center justify-center size-7 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors shrink-0"
+                                >
+                                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <path d="M9 3v18"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
 
                         {{-- Nav items --}}

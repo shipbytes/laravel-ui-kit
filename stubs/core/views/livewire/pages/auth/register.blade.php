@@ -47,8 +47,6 @@ new #[Layout('layouts.guest')] class extends Component
         <p class="mt-2 text-sm text-gray-500 font-booktext">{{ config('ui-kit.copy.register.subheading') }}</p>
     </div>
 
-    @include('layouts.partials.social-buttons')
-
     <form wire:submit="register" class="space-y-5">
         <div>
             <label for="name" class="block text-sm font-semibold text-gray-950 mb-2">Name</label>

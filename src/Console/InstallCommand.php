@@ -20,7 +20,7 @@ class InstallCommand extends Command
 
     protected $signature = 'ui-kit:install
                             {--force : Overwrite existing files without prompting}
-                            {--modules= : Comma-separated module slugs to install non-interactively}';
+                            {--modules= : Comma-separated module slugs (or "all") to install non-interactively}';
 
     protected $description = 'Install the UI Kit core and optionally pick modules interactively.';
 
@@ -45,22 +45,15 @@ class InstallCommand extends Command
 
         $selected = $this->resolveSelectedModules($registry);
 
+        if ($selected === null) {
+            return self::FAILURE;
+        }
+
         foreach ($selected as $slug) {
-            $args = [
+            $this->call('ui-kit:install-module', [
                 'module' => $slug,
                 '--from-parent' => true,
-            ];
-
-            // Pass through provider selection for analytics so non-interactive
-            // installs work without a second prompt.
-            if ($slug === 'analytics' && $this->option('modules') !== null) {
-                // Default to all providers when invoking non-interactively with
-                // --modules=all etc. Users can still pin specific ones via
-                // --providers when running ui-kit:install-module directly.
-                $args['--providers'] = 'utm,ga4,posthog';
-            }
-
-            $this->call('ui-kit:install-module', $args);
+            ]);
         }
 
         $this->newLine();
@@ -103,7 +96,7 @@ class InstallCommand extends Command
 
         $this->line("  <fg=yellow>{$step}.</> Add the kit's component tags to your master layout (<info>resources/views/layouts/app.blade.php</info>):");
         $this->line('       <fg=gray>&lt;head&gt;</>');
-        $this->line('       <fg=gray>    &lt;x-ui-kit::head /&gt;       <!-- analytics + dark-mode no-flash --&gt;</>');
+        $this->line('       <fg=gray>    &lt;x-ui-kit::head /&gt;       <!-- dark-mode no-flash --&gt;</>');
         $this->line('       <fg=gray>&lt;/head&gt;</>');
         $this->line('       <fg=gray>&lt;body&gt;</>');
         $this->line('       <fg=gray>    &lt;x-ui-kit::banners /&gt;    <!-- impersonation ribbon --&gt;</>');
@@ -113,10 +106,6 @@ class InstallCommand extends Command
 
         $this->line("  <fg=yellow>{$step}.</> Set <info>.env</info> keys for the features you enabled:");
         $this->line('       <fg=gray>MAIL_*</>           required for password reset / verification');
-        if (in_array('analytics', $selected, true)) {
-            $this->line('       <fg=gray>GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX</>   (analytics:ga4)');
-            $this->line('       <fg=gray>POSTHOG_PUBLIC_KEY=phc_…</>            (analytics:posthog)');
-        }
         $this->newLine();
         $step++;
 
@@ -138,11 +127,6 @@ class InstallCommand extends Command
             $meta = $registry->get($slug);
             foreach ((array) ($meta['post_install_notes'] ?? []) as $note) {
                 $residual[] = "<fg=gray>[{$slug}]</> {$note}";
-            }
-            foreach ((array) ($meta['providers_meta'] ?? []) as $provider => $pMeta) {
-                foreach ((array) ($pMeta['post_install_notes'] ?? []) as $note) {
-                    $residual[] = "<fg=gray>[{$slug}:{$provider}]</> {$note}";
-                }
             }
         }
 
@@ -297,18 +281,26 @@ class InstallCommand extends Command
     }
 
     /**
-     * @return array<int, string>
+     * Resolve which modules to install. Returns null on invalid input so the
+     * caller can abort with a failure exit code.
+     *
+     * @return array<int, string>|null
      */
-    protected function resolveSelectedModules(ModuleRegistry $registry): array
+    protected function resolveSelectedModules(ModuleRegistry $registry): ?array
     {
         if ($this->option('modules') !== null) {
             $requested = array_filter(array_map('trim', explode(',', (string) $this->option('modules'))));
+
+            if ($requested === ['all']) {
+                return array_keys($registry->all());
+            }
+
             $unknown = array_diff($requested, array_keys($registry->all()));
 
             if (! empty($unknown)) {
-                $this->error('Unknown modules: '.implode(', ', $unknown));
+                $this->error('Unknown modules: '.implode(', ', $unknown).'. Available: all, '.implode(', ', array_keys($registry->all())));
 
-                return [];
+                return null;
             }
 
             return array_values($requested);
