@@ -10,9 +10,13 @@ use Shipbytes\UiKit\Support\ModuleRegistry;
 use Shipbytes\UiKit\Support\NullBadgeResolver;
 use Shipbytes\UiKit\View\Components\UiKitBanners;
 use Shipbytes\UiKit\View\Components\UiKitHead;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Livewire\Volt\Volt;
 
 class UiKitServiceProvider extends ServiceProvider
@@ -45,7 +49,33 @@ class UiKitServiceProvider extends ServiceProvider
         }
 
         $this->registerRoutes();
+        $this->registerRateLimiters();
         $this->registerVoltMountPaths();
+    }
+
+    /**
+     * Fortify's POST endpoints are registered with 'throttle:login' and
+     * 'throttle:two-factor', but a fresh app never defines those named
+     * limiters — any direct hit on them would throw (and go unthrottled).
+     * Register sane defaults unless the app already did.
+     */
+    protected function registerRateLimiters(): void
+    {
+        if (RateLimiter::limiter('login') === null) {
+            RateLimiter::for('login', function (Request $request) {
+                $email = Str::transliterate(Str::lower((string) $request->input('email')));
+
+                return Limit::perMinute(5)->by($email.'|'.$request->ip());
+            });
+        }
+
+        if (RateLimiter::limiter('two-factor') === null) {
+            RateLimiter::for('two-factor', function (Request $request) {
+                return Limit::perMinute(5)->by(
+                    ($request->session()->get('login.id') ?? $request->ip()).'|'.$request->ip()
+                );
+            });
+        }
     }
 
     /**

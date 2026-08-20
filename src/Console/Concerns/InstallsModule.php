@@ -204,8 +204,9 @@ trait InstallsModule
         $installed = config('ui-kit.installed_modules', []);
         $hasAdmin = in_array('admin-middleware', $installed, true);
         $hasImpersonate = in_array('impersonation', $installed, true);
+        $hasProfile = in_array('profile', $installed, true);
 
-        if (! $hasAdmin && ! $hasImpersonate) {
+        if (! $hasAdmin && ! $hasImpersonate && ! $hasProfile) {
             return; // no relevant modules → no trait needed
         }
 
@@ -223,6 +224,12 @@ trait InstallsModule
         if ($hasAdmin) {
             $imports[] = 'use Spatie\\Permission\\Traits\\HasRoles;';
             $traitUses[] = 'use HasRoles;';
+        }
+
+        if ($hasProfile) {
+            // Powers the profile page's 2FA card and the login challenge.
+            $imports[] = 'use Laravel\\Fortify\\TwoFactorAuthenticatable;';
+            $traitUses[] = 'use TwoFactorAuthenticatable;';
         }
 
         if ($hasImpersonate) {

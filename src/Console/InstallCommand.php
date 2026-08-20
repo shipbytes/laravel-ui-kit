@@ -41,6 +41,13 @@ class InstallCommand extends Command
         $this->configureFortify();
         $this->patchViteEntrypoints();
 
+        // Fortify's two_factor_* columns back the profile module's 2FA card
+        // and the login challenge. Publish once — the migration isn't
+        // guarded, so a re-published copy would fail on migrate.
+        if ((glob(database_path('migrations/*_add_two_factor_columns_to_users_table.php')) ?: []) === []) {
+            $this->deferVendorPublish(['--tag' => 'fortify-migrations']);
+        }
+
         // The kit ships at least one core migration (add_is_admin_to_users_table).
         $this->deferMigrate();
 
@@ -81,7 +88,8 @@ class InstallCommand extends Command
         $this->newLine();
 
         $needsUserTrait = in_array('admin-middleware', $selected, true)
-            || in_array('impersonation', $selected, true);
+            || in_array('impersonation', $selected, true)
+            || in_array('profile', $selected, true);
 
         $step = 1;
 
@@ -250,6 +258,15 @@ class InstallCommand extends Command
         if (str_contains($patched, "'home' => '/home'")) {
             $patched = str_replace("'home' => '/home'", "'home' => '/'", $patched);
             $this->line('  ✓ patched <info>fortify.php</info> <comment>home=/</comment>');
+        }
+
+        // The kit ships no passkey UI; leaving the feature on registers
+        // passkey endpoints that can only error. Comment it out (consumers
+        // who build their own UI can re-enable it).
+        if (str_contains($patched, 'Features::passkeys()')
+            && ! str_contains($patched, '// Features::passkeys()')) {
+            $patched = str_replace('Features::passkeys()', '// Features::passkeys()', $patched);
+            $this->line('  ✓ patched <info>fortify.php</info> <comment>passkeys feature off</comment> (kit ships no passkey UI)');
         }
 
         if ($patched !== $contents) {

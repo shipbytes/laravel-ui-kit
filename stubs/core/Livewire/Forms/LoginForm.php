@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Fortify\Features;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 
@@ -21,11 +22,21 @@ class LoginForm extends Form
     #[Validate('boolean')]
     public bool $remember = false;
 
-    public function authenticate(): void
+    /**
+     * Validate the credentials and either log the user in or stage a
+     * two-factor challenge.
+     *
+     * Returns true when fully authenticated; false when the user must be
+     * sent to the two-factor challenge page (the challenged user is stashed
+     * in the session, mirroring Fortify's flow).
+     */
+    public function authenticate(): bool
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only(['email', 'password']), $this->remember)) {
+        $guard = Auth::guard('web');
+
+        if (! $guard->validate($this->only(['email', 'password']))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -33,7 +44,34 @@ class LoginForm extends Form
             ]);
         }
 
+        $user = $guard->getLastAttempted();
+
         RateLimiter::clear($this->throttleKey());
+
+        if ($this->twoFactorChallengeRequired($user)) {
+            request()->session()->put([
+                'ui-kit.login.id' => $user->getAuthIdentifier(),
+                'ui-kit.login.remember' => $this->remember,
+            ]);
+
+            return false;
+        }
+
+        Auth::login($user, $this->remember);
+
+        return true;
+    }
+
+    /**
+     * The challenge only applies when Fortify's feature is on AND the user
+     * model actually uses TwoFactorAuthenticatable AND this user finished
+     * enabling it.
+     */
+    protected function twoFactorChallengeRequired(object $user): bool
+    {
+        return Features::enabled(Features::twoFactorAuthentication())
+            && method_exists($user, 'hasEnabledTwoFactorAuthentication')
+            && $user->hasEnabledTwoFactorAuthentication();
     }
 
     protected function ensureIsNotRateLimited(): void

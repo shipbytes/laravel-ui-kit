@@ -74,6 +74,12 @@ class InstallCommandTest extends TestCase
         foreach (glob(database_path('migrations/*_add_is_admin_to_users_table.php')) ?: [] as $file) {
             @unlink($file);
         }
+        foreach (glob(database_path('migrations/*_add_two_factor_columns_to_users_table.php')) ?: [] as $file) {
+            @unlink($file);
+        }
+        foreach (glob(database_path('migrations/*_create_passkeys_table.php')) ?: [] as $file) {
+            @unlink($file);
+        }
         foreach (glob(database_path('migrations/2024_*.php')) ?: [] as $file) {
             @unlink($file);
         }
@@ -134,14 +140,21 @@ class InstallCommandTest extends TestCase
         $this->assertStringContainsString("import './ui-kit';", file_get_contents(resource_path('js/app.js')));
         $this->assertFileExists(resource_path('css/ui-kit-theme.css'));
 
-        // The single deferred migrate covered core + module migrations.
+        // The single deferred migrate covered core + module + Fortify 2FA migrations.
         $this->assertTrue(Schema::hasColumn('users', 'is_admin'));
         $this->assertTrue(Schema::hasColumn('users', 'avatar_path'));
+        $this->assertTrue(Schema::hasColumn('users', 'two_factor_secret'));
         $this->assertTrue(Schema::hasTable('support_tickets'));
         $this->assertTrue(Schema::hasTable('contact_submissions'));
 
-        // No admin/impersonation modules selected → no trait generated.
-        $this->assertFileDoesNotExist(app_path('Models/Concerns/UiKitUser.php'));
+        // profile is in the set → the trait must be generated in this same
+        // process, bundling TwoFactorAuthenticatable (and nothing from the
+        // modules that weren't selected).
+        $this->assertFileExists(app_path('Models/Concerns/UiKitUser.php'));
+        $trait = file_get_contents(app_path('Models/Concerns/UiKitUser.php'));
+        $this->assertStringContainsString('use TwoFactorAuthenticatable;', $trait);
+        $this->assertStringNotContainsString('HasRoles', $trait);
+        $this->assertStringNotContainsString('Impersonate', $trait);
 
         // ---- Re-run: must succeed non-interactively (update mode) and stay idempotent.
         $this->artisan('ui-kit:install', ['--modules' => self::MODULES, '--no-interaction' => true])
@@ -164,6 +177,11 @@ class InstallCommandTest extends TestCase
             1,
             glob(database_path('migrations/*_add_is_admin_to_users_table.php')) ?: [],
             're-publishing must reuse the existing is_admin migration filename'
+        );
+        $this->assertCount(
+            1,
+            glob(database_path('migrations/*_add_two_factor_columns_to_users_table.php')) ?: [],
+            "Fortify's unguarded 2FA migration must not be re-published on re-runs"
         );
     }
 

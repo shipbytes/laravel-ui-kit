@@ -9,8 +9,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>Admin — {{ config('ui-kit.brand.name') }}</title>
+        <x-ui-kit::head />
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700|poppins:600,700|montserrat:400,500&display=swap" rel="stylesheet" />
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @stack('head')
     </head>
@@ -82,13 +83,35 @@
                         </div>
 
                         {{-- Footer --}}
-                        <div class="border-t border-zinc-950/5 dark:border-white/5 p-2">
+                        <div class="border-t border-zinc-950/5 dark:border-white/5 p-2 space-y-1">
                             <a href="{{ \Shipbytes\UiKit\Support\UiKit::homeUrl() }}" wire:navigate
                                :class="$store.sidebar.collapsed ? 'size-8 p-2 justify-center' : 'w-full gap-3 px-2 py-2'"
                                class="flex items-center rounded-lg text-sm font-medium text-zinc-600 hover:bg-zinc-950/5 dark:text-zinc-300 dark:hover:bg-white/5">
                                 <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                                 <span x-show="!$store.sidebar.collapsed">Back to site</span>
                             </a>
+
+                            {{-- Current user + logout --}}
+                            <div :class="$store.sidebar.collapsed ? 'flex-col gap-1 py-1' : 'flex-row gap-2 px-2 py-1.5'"
+                                 class="flex items-center">
+                                <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+                                      title="{{ auth()->user()->name ?? '' }}">
+                                    {{ strtoupper(mb_substr(auth()->user()->name ?? '?', 0, 1)) }}
+                                </span>
+                                <div x-show="!$store.sidebar.collapsed" class="min-w-0 flex-1">
+                                    <div class="truncate text-xs font-medium text-zinc-950 dark:text-zinc-100">{{ auth()->user()->name ?? '' }}</div>
+                                    @if (Illuminate\Support\Facades\Route::has('profile'))
+                                        <a href="{{ route('profile') }}" wire:navigate class="text-[11px] text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200">Profile</a>
+                                    @endif
+                                </div>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" title="Log out"
+                                            class="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-950/5 hover:text-zinc-700 dark:hover:bg-white/5 dark:hover:text-zinc-200">
+                                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </nav>
                 </div>
