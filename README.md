@@ -78,7 +78,7 @@ php artisan ui-kit:install --modules=all
 ```
 
 <details>
-<summary><strong>Installing before a Packagist release (or straight from GitHub / a local path)</strong></summary>
+<summary><strong>Installing straight from GitHub or a local path (contributors)</strong></summary>
 
 **From GitHub (VCS repository):**
 

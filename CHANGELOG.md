@@ -4,18 +4,19 @@ All notable changes to `shipbytes/laravel-ui-kit` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> **Pre-1.0 release policy.** While the kit is in early iteration, the v0.1.0
-> tag is rolling — fixes and improvements land under it rather than bumping
-> the patch version. Pin to a commit if you need a frozen reference.
+> Published versions are immutable (Packagist enforces this): every
+> publishable state gets a fresh tag. Pre-1.0, breaking changes bump the
+> minor version.
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-08-20
+## [0.2.0] - 2026-08-20
 
-Initial public release. Contents updated in place during early iteration —
-the 2026-08-20 revision is a **scope reset** following a full audit.
+**Scope reset + audit-fix release.** A full-codebase audit found v0.1.0 had
+never survived a real end-to-end install; this release narrows the kit to a
+fresh-Laravel-12 turnkey experience and fixes everything the audit surfaced.
 
-### Scope reset (2026-08-20) — breaking
+### Breaking — scope reset
 
 - **Laravel 12+ only.** Constraints are now `php: ^8.2`,
   `illuminate/*: ^12 || ^13`, `laravel/fortify: ^1.25`,
@@ -35,7 +36,7 @@ the 2026-08-20 revision is a **scope reset** following a full audit.
 - **Socialite feature flag + social-buttons partial removed** (they pointed
   at routes that never existed).
 
-### Fixed (2026-08-20 audit)
+### Fixed (full-codebase audit)
 
 - Fresh installs no longer 500 on every core page: `route('home')` calls were
   replaced by `UiKit::homeUrl()`, which falls back to `/` when the configured
@@ -79,8 +80,13 @@ the 2026-08-20 revision is a **scope reset** following a full audit.
 - `composer` is resolved via `ExecutableFinder` (Windows `composer.bat`).
 - The activity-log nav icon (`clock`) actually exists; Poppins/Montserrat
   fonts referenced by the theme are actually loaded.
+- Install tail commands (vendor:publish, migrate, db:seed, storage:link)
+  run in a fresh `php artisan` subprocess when the run composer-required
+  new packages — the running process's autoloader can't see them, which
+  silently skipped Spatie's publishes and crashed `AdminRoleSeeder`.
+  Caught by the new fresh-app CI job on its first run.
 
-### Added (2026-08-20)
+### Added
 
 - **Working two-factor authentication end to end**: Fortify's 2FA columns
   are published and migrated by the installer; the generated `UiKitUser`
@@ -126,5 +132,18 @@ the 2026-08-20 revision is a **scope reset** following a full audit.
   `routes/admin.php`, `routes/ui-kit-user.php`.
 - `SidebarBadgeResolver` contract for host-app badge counts.
 
-[Unreleased]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.1.0...HEAD
+## [0.1.0] - 2026-04-24
+
+Initial public release: core scaffold (Volt auth pages, admin shell,
+dashboard stub, users list) plus 9 optional modules — including analytics
+(UTM/GA4/PostHog) and dark-mode — on Laravel 10–13 with a Tailwind 3
+preset, marker-based installers, and a PHP 8.1–8.4 × Laravel 10/11/12 CI
+matrix.
+
+**Superseded by 0.2.0**, which removed the analytics module, dropped
+Laravel 10/11, moved to Tailwind v4, and fixed the install-breaking bugs
+found in audit — see its notes before upgrading.
+
+[Unreleased]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/shipbytes/laravel-ui-kit/releases/tag/v0.1.0
