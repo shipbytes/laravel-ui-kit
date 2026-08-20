@@ -43,6 +43,30 @@ Modules that ship models also ship **factories**, so `SupportTicket::factory()` 
 
 The kit is designed for **fresh Laravel installs** (no auth scaffolding yet). Running it on top of Breeze, Jetstream, or a custom auth setup will collide.
 
+### Creating the fresh app — recommended choices
+
+```bash
+laravel new my-app        # or: composer create-project laravel/laravel my-app
+```
+
+When the Laravel installer prompts you:
+
+| Prompt | Pick | Why |
+| --- | --- | --- |
+| Starter kit | **None** | The kit *is* the auth/admin scaffolding — every starter kit (Breeze-style Livewire, React, Vue) collides with it. |
+| Frontend stack | **Blade** | Gives you plain Vite + Tailwind CSS v4, which the kit's `@theme` file plugs straight into. Livewire 3 + Volt arrive via Composer with the kit itself. |
+| Testing framework | Pest or PHPUnit | No interaction with the kit — pick your preference. |
+| Database | Any (the SQLite default is fine) | The kit's migrations run on anything Laravel supports. |
+| Run `npm install` / migrations | Yes | The kit's Vite wiring expects `resources/css/app.css` and `resources/js/app.js` to exist, and its installer migrates on top of the base tables. |
+
+> **Heads-up:** the stock Laravel welcome page shows a **Dashboard** button to
+> logged-in users that links to `/dashboard` — a route neither Laravel nor the
+> kit registers, so it 404s. The kit's panel lives at **`/admin`** (admin users
+> only). Point that button at `/admin` or replace the welcome page after
+> installing.
+
+### The preflight check
+
 The installer runs a **preflight check**: it reads `composer.lock` for `laravel/breeze` / `laravel/jetstream` and scans for colliding files (`routes/auth.php`, `app/Livewire/Forms/LoginForm.php`, auth page views). Behaviour:
 
 - **Jetstream detected** → aborts. Pass `--force` to override (not recommended).
@@ -292,6 +316,7 @@ Run `php artisan ui-kit:doctor` first — it catches the common ones and prints 
 - **"Unauthorized" on `/admin`** — the fallback middleware requires `$user->is_admin` to be truthy; with `admin-middleware` installed you need the `admin` role assigned.
 - **Sidebar badges show 0 / blank** — bind your own `SidebarBadgeResolver`; the default returns an empty array.
 - **`route:cache` fails with a duplicate name** — the doctor lists the duplicates; usually a route file was copied without its `ui-kit:managed` header and loaded twice by hand.
+- **The welcome page's "Dashboard" button 404s** — that button is stock Laravel and links to `/dashboard`, which nothing registers. The kit's panel is at `/admin`; edit `resources/views/welcome.blade.php` to point there (or replace the page).
 
 ## Testing the package
 
