@@ -2,14 +2,6 @@
 
 namespace Shipbytes\UiKit;
 
-use Shipbytes\UiKit\Console\InstallCommand;
-use Shipbytes\UiKit\Console\InstallModuleCommand;
-use Shipbytes\UiKit\Console\ListModulesCommand;
-use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
-use Shipbytes\UiKit\Support\ModuleRegistry;
-use Shipbytes\UiKit\Support\NullBadgeResolver;
-use Shipbytes\UiKit\View\Components\UiKitBanners;
-use Shipbytes\UiKit\View\Components\UiKitHead;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
@@ -18,6 +10,15 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Livewire\Volt\Volt;
+use Shipbytes\UiKit\Console\DoctorCommand;
+use Shipbytes\UiKit\Console\InstallCommand;
+use Shipbytes\UiKit\Console\InstallModuleCommand;
+use Shipbytes\UiKit\Console\ListModulesCommand;
+use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
+use Shipbytes\UiKit\Support\ModuleRegistry;
+use Shipbytes\UiKit\Support\NullBadgeResolver;
+use Shipbytes\UiKit\View\Components\UiKitBanners;
+use Shipbytes\UiKit\View\Components\UiKitHead;
 
 class UiKitServiceProvider extends ServiceProvider
 {
@@ -43,6 +44,7 @@ class UiKitServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 InstallModuleCommand::class,
                 ListModulesCommand::class,
+                DoctorCommand::class,
             ]);
 
             $this->registerPublishers();
@@ -144,8 +146,7 @@ class UiKitServiceProvider extends ServiceProvider
         ], 'ui-kit-routes');
 
         $this->publishes([
-            $core.'/migrations/2024_01_01_000000_add_is_admin_to_users_table.php'
-                => $this->migrationTarget('add_is_admin_to_users_table'),
+            $core.'/migrations/2024_01_01_000000_add_is_admin_to_users_table.php' => $this->migrationTarget('add_is_admin_to_users_table'),
         ], 'ui-kit-migrations');
     }
 

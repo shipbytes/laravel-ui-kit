@@ -1,0 +1,17 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+    # Stubs are published into consumer apps and reference App\* classes
+    # that only exist there — they're covered by php -l and the e2e tests.
+    ignoreErrors:
+        # The ui-kit:: view namespace is only registered at runtime, so the
+        # literal names can't be statically verified as view-strings.
+        -
+            message: '#expects view-string#'
+            paths:
+                - src/View/Components/UiKitBanners.php
+                - src/View/Components/UiKitHead.php

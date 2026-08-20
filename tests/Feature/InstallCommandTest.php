@@ -32,57 +32,15 @@ class InstallCommandTest extends TestCase
         parent::setUp();
 
         // Mimic a fresh Laravel 12 app's Vite entrypoints (Tailwind v4).
-        (new Filesystem())->ensureDirectoryExists(resource_path('css'));
-        (new Filesystem())->ensureDirectoryExists(resource_path('js'));
+        (new Filesystem)->ensureDirectoryExists(resource_path('css'));
+        (new Filesystem)->ensureDirectoryExists(resource_path('js'));
         file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n\n@source '../views';\n");
         file_put_contents(resource_path('js/app.js'), "import './bootstrap';\n");
     }
 
     protected function tearDown(): void
     {
-        $fs = new Filesystem();
-
-        foreach ([
-            config_path('ui-kit.php'),
-            config_path('admin.php'),
-            config_path('fortify.php'),
-            base_path('routes/auth.php'),
-            base_path('routes/admin.php'),
-            base_path('routes/ui-kit-user.php'),
-            resource_path('js/ui-kit.js'),
-            resource_path('js/app.js'),
-            resource_path('css/ui-kit.css'),
-            resource_path('css/ui-kit-theme.css'),
-            resource_path('css/app.css'),
-            public_path('storage'),
-        ] as $file) {
-            if (is_link($file) || is_file($file)) {
-                @unlink($file);
-            }
-        }
-
-        foreach ([
-            app_path('Livewire'),
-            app_path('Models/Concerns'),
-            resource_path('views/layouts'),
-            resource_path('views/components'),
-            resource_path('views/livewire'),
-        ] as $dir) {
-            $fs->deleteDirectory($dir);
-        }
-
-        foreach (glob(database_path('migrations/*_add_is_admin_to_users_table.php')) ?: [] as $file) {
-            @unlink($file);
-        }
-        foreach (glob(database_path('migrations/*_add_two_factor_columns_to_users_table.php')) ?: [] as $file) {
-            @unlink($file);
-        }
-        foreach (glob(database_path('migrations/*_create_passkeys_table.php')) ?: [] as $file) {
-            @unlink($file);
-        }
-        foreach (glob(database_path('migrations/2024_*.php')) ?: [] as $file) {
-            @unlink($file);
-        }
+        $this->cleanSkeleton();
 
         parent::tearDown();
     }
@@ -183,6 +141,12 @@ class InstallCommandTest extends TestCase
             glob(database_path('migrations/*_add_two_factor_columns_to_users_table.php')) ?: [],
             "Fortify's unguarded 2FA migration must not be re-published on re-runs"
         );
+
+        // A freshly-completed install should pass its own health check. This
+        // (via the storage-link check) is also the regression net for the
+        // trait-static deferred-queue bug: module deferrals must reach the
+        // parent installer's drain.
+        $this->artisan('ui-kit:doctor')->assertSuccessful();
     }
 
     public function test_unknown_module_aborts_with_failure(): void

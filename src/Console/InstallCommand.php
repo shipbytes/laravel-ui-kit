@@ -2,11 +2,11 @@
 
 namespace Shipbytes\UiKit\Console;
 
-use Shipbytes\UiKit\Console\Concerns\InstallsModule;
-use Shipbytes\UiKit\Support\ModuleRegistry;
 use Composer\InstalledVersions;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use Shipbytes\UiKit\Console\Concerns\InstallsModule;
+use Shipbytes\UiKit\Support\ModuleRegistry;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
@@ -184,7 +184,7 @@ class InstallCommand extends Command
         if (file_exists($js)) {
             $contents = file_get_contents($js);
 
-            if (! str_contains($contents, "./ui-kit")) {
+            if (! str_contains($contents, './ui-kit')) {
                 file_put_contents($js, rtrim($contents, "\n")."\nimport './ui-kit';\n");
                 $this->line("  ✓ patched <info>resources/js/app.js</info> <comment>import './ui-kit'</comment>");
             }

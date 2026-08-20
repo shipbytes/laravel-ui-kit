@@ -33,7 +33,7 @@
                             <a href="{{ route(config('admin.route_name_prefix').'dashboard') }}" wire:navigate
                                :class="$store.sidebar.collapsed ? 'p-1' : 'px-1.5 py-1.5'"
                                class="flex items-center gap-2 rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors">
-                                <img src="{{ asset(config('ui-kit.brand.logo')) }}" alt="{{ config('ui-kit.brand.name') }}" class="size-6 shrink-0">
+                                @include('layouts.partials.brand-mark', ['markClass' => 'size-6 shrink-0', 'badgeClass' => 'size-6'])
                                 <span x-show="!$store.sidebar.collapsed" class="truncate text-sm font-semibold text-zinc-950 dark:text-zinc-100">Admin</span>
                             </a>
                             <div :class="$store.sidebar.collapsed ? 'flex-col' : 'flex-row'" class="flex items-center gap-0.5 shrink-0">

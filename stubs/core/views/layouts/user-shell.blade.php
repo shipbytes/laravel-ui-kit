@@ -27,7 +27,7 @@
         <header class="bg-white dark:bg-zinc-900 border-b border-zinc-950/5 dark:border-white/10">
             <div class="mx-auto flex h-14 max-w-4xl items-center justify-between px-4 sm:px-6">
                 <a href="{{ \Shipbytes\UiKit\Support\UiKit::homeUrl() }}" wire:navigate class="flex items-center gap-2">
-                    <img src="{{ asset(config('ui-kit.brand.logo')) }}" alt="{{ config('ui-kit.brand.name') }}" class="h-6 w-auto">
+                    @include('layouts.partials.brand-mark', ['markClass' => 'h-6 w-auto', 'badgeClass' => 'size-6'])
                     <span class="font-boldtext text-sm font-semibold text-zinc-950 dark:text-zinc-50">{{ config('ui-kit.brand.name') }}</span>
                 </a>
 

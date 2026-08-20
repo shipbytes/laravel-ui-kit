@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Admin\Activity;
 
+use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Spatie\Activitylog\Models\Activity;
 
 #[Layout('layouts.admin-sidebar')]
 class ActivityViewer extends Component
@@ -37,7 +39,7 @@ class ActivityViewer extends Component
 
     public function render()
     {
-        $activityModel = config('activitylog.activity_model', \Spatie\Activitylog\Models\Activity::class);
+        $activityModel = config('activitylog.activity_model', Activity::class);
 
         $query = $activityModel::query()->with('causer', 'subject')->latest();
 
@@ -46,7 +48,7 @@ class ActivityViewer extends Component
         }
 
         if ($this->causerEmail !== '') {
-            $userModel = config('auth.providers.users.model', \App\Models\User::class);
+            $userModel = config('auth.providers.users.model', User::class);
             $causerIds = $userModel::where('email', 'like', '%'.$this->causerEmail.'%')->pluck('id');
             $query->whereIn('causer_id', $causerIds)->where('causer_type', $userModel);
         }

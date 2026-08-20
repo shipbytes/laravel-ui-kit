@@ -2,9 +2,10 @@
 
 namespace Shipbytes\UiKit\Console;
 
+use Composer\InstalledVersions;
+use Illuminate\Console\Command;
 use Shipbytes\UiKit\Console\Concerns\InstallsModule;
 use Shipbytes\UiKit\Support\ModuleRegistry;
-use Illuminate\Console\Command;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
@@ -137,21 +138,21 @@ class InstallModuleCommand extends Command
         $missing = array_filter($packages, function (string $requirement) {
             [$name] = explode(':', $requirement, 2);
 
-            return ! class_exists(\Composer\InstalledVersions::class)
-                || ! \Composer\InstalledVersions::isInstalled($name);
+            return ! class_exists(InstalledVersions::class)
+                || ! InstalledVersions::isInstalled($name);
         });
 
         if (empty($missing)) {
             return;
         }
 
-        if (! confirm("This module requires: ".implode(', ', $missing).". Run composer require now?", default: true)) {
-            $this->warn("Skipped composer require. You must install manually: composer require ".implode(' ', $missing));
+        if (! confirm('This module requires: '.implode(', ', $missing).'. Run composer require now?', default: true)) {
+            $this->warn('Skipped composer require. You must install manually: composer require '.implode(' ', $missing));
 
             return;
         }
 
-        $composer = (new ExecutableFinder())->find('composer', 'composer');
+        $composer = (new ExecutableFinder)->find('composer', 'composer');
 
         $process = new Process(array_merge([$composer, 'require'], $missing), base_path());
         $process->setTimeout(null);

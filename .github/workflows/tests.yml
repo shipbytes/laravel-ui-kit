@@ -22,6 +22,23 @@ jobs:
           find src stubs tests -type f -name "*.php" -print0 \
             | xargs -0 -I {} php -l -n {} > /dev/null
 
+  static:
+    runs-on: ubuntu-latest
+    needs: lint
+    name: Pint + Larastan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+      - name: Pint (code style)
+        run: vendor/bin/pint --test
+      - name: Larastan (static analysis)
+        run: vendor/bin/phpstan analyse --no-progress
+
   tests:
     runs-on: ubuntu-latest
     needs: lint
@@ -74,3 +91,75 @@ jobs:
 
       - name: Run tests
         run: vendor/bin/phpunit
+
+  # The job the unit suite can't replace: a REAL fresh Laravel 12 app,
+  # path-repo install of the kit, full module install, npm build,
+  # route:cache, doctor, and HTTP smoke. Catches missing-route 500s,
+  # duplicate route names, and frontend-build breakage.
+  fresh-app:
+    runs-on: ubuntu-latest
+    needs: lint
+    name: Fresh Laravel 12 end-to-end
+    steps:
+      - name: Checkout kit
+        uses: actions/checkout@v4
+        with:
+          path: kit
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, curl, libxml, mbstring, zip, intl, fileinfo, sqlite3, pdo_sqlite
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Create fresh Laravel 12 app
+        run: composer create-project laravel/laravel:^12.0 app --no-interaction --prefer-dist
+
+      - name: Require the kit from the local path
+        working-directory: app
+        run: |
+          composer config repositories.ui-kit path ../kit
+          composer require "shipbytes/laravel-ui-kit:@dev" --no-interaction
+
+      - name: Run the installer with every module
+        working-directory: app
+        run: php artisan ui-kit:install --modules=all --no-interaction
+
+      - name: Apply the generated User trait (the one manual step)
+        working-directory: app
+        run: |
+          sed -i 's|use HasFactory, Notifiable;|use HasFactory, Notifiable, \\App\\Models\\Concerns\\UiKitUser;|' app/Models/User.php
+          php -l app/Models/User.php
+
+      - name: Build frontend assets
+        working-directory: app
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Route cache must survive (duplicate-name regression net)
+        working-directory: app
+        run: |
+          php artisan route:cache
+          php artisan route:clear
+
+      - name: Kit health check
+        working-directory: app
+        run: php artisan ui-kit:doctor
+
+      - name: HTTP smoke
+        working-directory: app
+        run: |
+          php artisan serve --port=8787 &
+          sleep 3
+          set -e
+          curl -fsS http://127.0.0.1:8787/login | grep -q "Welcome back"
+          curl -fsS http://127.0.0.1:8787/register | grep -q "Create your account"
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/admin)
+          test "$code" = "302" || { echo "/admin expected 302 for guests, got $code"; exit 1; }
+          curl -fsS http://127.0.0.1:8787/ > /dev/null
+          echo "smoke OK"

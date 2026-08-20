@@ -2,9 +2,7 @@
 
 namespace Shipbytes\UiKit\Tests\Feature;
 
-use Shipbytes\UiKit\Console\InstallCommand;
-use Shipbytes\UiKit\Console\InstallModuleCommand;
-use Shipbytes\UiKit\Console\ListModulesCommand;
+use Illuminate\Support\ServiceProvider;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
 use Shipbytes\UiKit\Support\ModuleRegistry;
 use Shipbytes\UiKit\Support\NullBadgeResolver;
@@ -41,6 +39,7 @@ class ServiceProviderTest extends TestCase
         $this->assertContains('ui-kit:install', $commands);
         $this->assertContains('ui-kit:install-module', $commands);
         $this->assertContains('ui-kit:list-modules', $commands);
+        $this->assertContains('ui-kit:doctor', $commands);
     }
 
     public function test_publish_tags_are_registered(): void
@@ -54,11 +53,11 @@ class ServiceProviderTest extends TestCase
             'ui-kit-migrations',
         ];
 
-        $paths = \Illuminate\Support\ServiceProvider::pathsToPublish(null, null);
+        $paths = ServiceProvider::pathsToPublish(null, null);
         $this->assertNotEmpty($paths);
 
         foreach ($tags as $tag) {
-            $tagged = \Illuminate\Support\ServiceProvider::pathsToPublish(null, $tag);
+            $tagged = ServiceProvider::pathsToPublish(null, $tag);
             $this->assertNotEmpty($tagged, "Publish tag {$tag} has no registered paths");
         }
     }

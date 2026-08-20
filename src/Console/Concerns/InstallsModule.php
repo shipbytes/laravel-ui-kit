@@ -5,33 +5,19 @@ namespace Shipbytes\UiKit\Console\Concerns;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Laravel\Prompts\Prompt;
+use Shipbytes\UiKit\Support\InstallQueue;
 
 trait InstallsModule
 {
     /**
-     * Deferred-command state is process-wide so a child command invoked via
-     * $this->call('ui-kit:install-module', …) can register commands that the
-     * parent ui-kit:install drains at the end of the run.
+     * Deferred-command state lives in InstallQueue so a child command invoked
+     * via $this->call('ui-kit:install-module', …) can register commands that
+     * the parent ui-kit:install drains at the end of the run. (Trait statics
+     * would NOT work here — each using class gets its own copy.)
      */
-
-    /** @var array<int, string> */
-    protected static array $deferredVendorPublishes = [];
-
-    /** @var array<int, string> */
-    protected static array $deferredSeeders = [];
-
-    /** @var bool */
-    protected static bool $deferredStorageLink = false;
-
-    /** @var bool */
-    protected static bool $deferredMigrate = false;
-
     protected function resetDeferred(): void
     {
-        static::$deferredVendorPublishes = [];
-        static::$deferredSeeders = [];
-        static::$deferredStorageLink = false;
-        static::$deferredMigrate = false;
+        InstallQueue::reset();
     }
 
     protected function stubsPath(string $relative = ''): string
@@ -78,7 +64,7 @@ trait InstallsModule
      */
     protected function copyModuleTree(string $moduleSlug): void
     {
-        $fs = new Filesystem();
+        $fs = new Filesystem;
         $source = $this->stubsPath("modules/{$moduleSlug}");
 
         if (! is_dir($source)) {
@@ -214,7 +200,7 @@ trait InstallsModule
         $path = $dir.'/UiKitUser.php';
 
         if (! is_dir($dir)) {
-            (new Filesystem())->ensureDirectoryExists($dir);
+            (new Filesystem)->ensureDirectoryExists($dir);
         }
 
         $imports = [];
@@ -343,7 +329,7 @@ PHP;
 
         $rendered = '';
         foreach ($toInject as $entry) {
-            $rendered .= "        ".$this->varExport($entry, 2).",\n";
+            $rendered .= '        '.$this->varExport($entry, 2).",\n";
         }
 
         // Preserve whatever earlier installs put between the markers — the
@@ -403,7 +389,7 @@ PHP;
         }
 
         if (! file_exists($path)) {
-            $this->warn(basename($path)." not found; skipping route patch.");
+            $this->warn(basename($path).' not found; skipping route patch.');
 
             return;
         }
@@ -411,7 +397,7 @@ PHP;
         $contents = file_get_contents($path);
 
         if (! str_contains($contents, $startMarker) || ! str_contains($contents, $endMarker)) {
-            $this->warn(basename($path)." is missing ui-kit route markers; skipping patch.");
+            $this->warn(basename($path).' is missing ui-kit route markers; skipping patch.');
 
             return;
         }
@@ -486,14 +472,20 @@ PHP;
         }
 
         $contents = file_get_contents($path);
-        $fallback = '\\Shipbytes\\UiKit\\Http\\Middleware\\EnsureIsAdminFallback::class';
         $real = '\\App\\Http\\Middleware\\EnsureUserIsAdmin::class';
 
         if (str_contains($contents, $real)) {
             return; // already swapped
         }
 
-        if (! str_contains($contents, $fallback)) {
+        // Match both the inline-FQCN form the kit ships and an imported
+        // short form (in case a consumer's tooling rewrote the config).
+        $fallback = collect([
+            '\\Shipbytes\\UiKit\\Http\\Middleware\\EnsureIsAdminFallback::class',
+            'EnsureIsAdminFallback::class',
+        ])->first(fn ($needle) => str_contains($contents, $needle));
+
+        if ($fallback === null) {
             $this->warn("Couldn't find the EnsureIsAdminFallback reference in config/admin.php; skipping middleware swap.");
 
             return;
@@ -518,26 +510,26 @@ PHP;
     protected function deferVendorPublish(array $args): void
     {
         $key = json_encode($args);
-        if (! in_array($key, static::$deferredVendorPublishes, true)) {
-            static::$deferredVendorPublishes[] = $key;
+        if (! in_array($key, InstallQueue::$vendorPublishes, true)) {
+            InstallQueue::$vendorPublishes[] = $key;
         }
     }
 
     protected function deferSeeder(string $class): void
     {
-        if (! in_array($class, static::$deferredSeeders, true)) {
-            static::$deferredSeeders[] = $class;
+        if (! in_array($class, InstallQueue::$seeders, true)) {
+            InstallQueue::$seeders[] = $class;
         }
     }
 
     protected function deferStorageLink(): void
     {
-        static::$deferredStorageLink = true;
+        InstallQueue::$storageLink = true;
     }
 
     protected function deferMigrate(): void
     {
-        static::$deferredMigrate = true;
+        InstallQueue::$migrate = true;
     }
 
     /**
@@ -547,25 +539,25 @@ PHP;
      */
     protected function runDeferredCommands(): void
     {
-        foreach (static::$deferredVendorPublishes as $argsJson) {
+        foreach (InstallQueue::$vendorPublishes as $argsJson) {
             $args = (array) json_decode($argsJson, true);
             Artisan::call('vendor:publish', $args);
             $label = $args['--provider'] ?? ($args['--tag'] ?? 'vendor:publish');
             $this->line("  ✓ published <info>{$label}</info>");
         }
 
-        if (static::$deferredMigrate) {
+        if (InstallQueue::$migrate) {
             $this->line('  · migrating database...');
             Artisan::call('migrate', ['--force' => true]);
             $this->line('  ✓ <info>migrate</info> done');
         }
 
-        foreach (static::$deferredSeeders as $class) {
+        foreach (InstallQueue::$seeders as $class) {
             Artisan::call('db:seed', ['--class' => $class, '--force' => true]);
             $this->line("  ✓ seeded <info>{$class}</info>");
         }
 
-        if (static::$deferredStorageLink) {
+        if (InstallQueue::$storageLink) {
             Artisan::call('storage:link');
             $this->line('  ✓ <info>storage:link</info> created');
         }

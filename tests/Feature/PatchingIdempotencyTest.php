@@ -2,13 +2,17 @@
 
 namespace Shipbytes\UiKit\Tests\Feature;
 
-use Shipbytes\UiKit\Tests\TestCase;
-use Shipbytes\UiKit\Console\InstallModuleCommand;
+use Illuminate\Console\OutputStyle;
 use Illuminate\Filesystem\Filesystem;
+use Shipbytes\UiKit\Console\InstallModuleCommand;
+use Shipbytes\UiKit\Tests\TestCase;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 
 class PatchingIdempotencyTest extends TestCase
 {
     private string $configDir;
+
     private string $routesDir;
 
     protected function setUp(): void
@@ -18,8 +22,8 @@ class PatchingIdempotencyTest extends TestCase
         $this->configDir = config_path();
         $this->routesDir = base_path('routes');
 
-        (new Filesystem())->ensureDirectoryExists($this->configDir);
-        (new Filesystem())->ensureDirectoryExists($this->routesDir);
+        (new Filesystem)->ensureDirectoryExists($this->configDir);
+        (new Filesystem)->ensureDirectoryExists($this->routesDir);
 
         // Seed the published files with markers, mimicking what
         // `php artisan vendor:publish --tag=ui-kit-config|ui-kit-routes` does.
@@ -133,13 +137,13 @@ class PatchingIdempotencyTest extends TestCase
 
     private function makeCommand(): InstallModuleCommand
     {
-        $command = new InstallModuleCommand();
+        $command = new InstallModuleCommand;
         $command->setLaravel($this->app);
 
         // Wire a no-op output so $this->line() / $this->warn() don't blow up.
-        $output = new \Symfony\Component\Console\Output\NullOutput();
-        $command->setOutput(new \Illuminate\Console\OutputStyle(
-            new \Symfony\Component\Console\Input\ArrayInput([]),
+        $output = new NullOutput;
+        $command->setOutput(new OutputStyle(
+            new ArrayInput([]),
             $output
         ));
 

@@ -2,8 +2,8 @@
 
 namespace Shipbytes\UiKit\Console;
 
-use Shipbytes\UiKit\Support\ModuleRegistry;
 use Illuminate\Console\Command;
+use Shipbytes\UiKit\Support\ModuleRegistry;
 
 class ListModulesCommand extends Command
 {

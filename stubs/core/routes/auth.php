@@ -3,10 +3,10 @@
 // ui-kit:managed — auto-loaded by UiKitServiceProvider. Delete this line to
 // opt out of auto-loading and wire this file up yourself.
 
-use Shipbytes\UiKit\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 use Livewire\Volt\Volt;
+use Shipbytes\UiKit\Http\Controllers\Auth\VerifyEmailController;
 
 Route::middleware('guest')->group(function () {
     Volt::route('register', 'pages.auth.register')->name('register');

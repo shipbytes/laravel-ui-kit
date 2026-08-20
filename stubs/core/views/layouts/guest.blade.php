@@ -23,7 +23,7 @@
             {{-- Logo --}}
             <div class="relative mb-8">
                 <a href="{{ \Shipbytes\UiKit\Support\UiKit::homeUrl() }}" wire:navigate class="flex items-center gap-3">
-                    <img src="{{ asset(config('ui-kit.brand.logo')) }}" class="h-8 w-auto" alt="{{ config('ui-kit.brand.name') }}">
+                    @include('layouts.partials.brand-mark', ['markClass' => 'h-8 w-auto', 'badgeClass' => 'size-8'])
                     <span class="font-boldtext text-xl tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.brand.name') }}</span>
                 </a>
             </div>

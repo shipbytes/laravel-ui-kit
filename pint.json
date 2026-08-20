@@ -1,0 +1,10 @@
+{
+    "preset": "laravel",
+    "exclude": [
+        "stubs/core/config"
+    ],
+    "notPath": [
+        "stubs/core/config/admin.php",
+        "stubs/core/config/ui-kit.php"
+    ]
+}

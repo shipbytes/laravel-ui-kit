@@ -2,9 +2,12 @@
 
 namespace Shipbytes\UiKit\Tests\Feature;
 
+use Illuminate\Console\OutputStyle;
 use Illuminate\Filesystem\Filesystem;
 use Shipbytes\UiKit\Console\InstallModuleCommand;
 use Shipbytes\UiKit\Tests\TestCase;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 
 class MarkInstalledTest extends TestCase
 {
@@ -12,14 +15,14 @@ class MarkInstalledTest extends TestCase
     {
         parent::setUp();
 
-        (new Filesystem())->ensureDirectoryExists(config_path());
+        (new Filesystem)->ensureDirectoryExists(config_path());
         copy(realpath(__DIR__.'/../../stubs/core/config/ui-kit.php'), config_path('ui-kit.php'));
     }
 
     protected function tearDown(): void
     {
         @unlink(config_path('ui-kit.php'));
-        (new Filesystem())->deleteDirectory(app_path('Models/Concerns'));
+        (new Filesystem)->deleteDirectory(app_path('Models/Concerns'));
 
         parent::tearDown();
     }
@@ -78,12 +81,12 @@ class MarkInstalledTest extends TestCase
 
     private function makeCommand(): InstallModuleCommand
     {
-        $command = new InstallModuleCommand();
+        $command = new InstallModuleCommand;
         $command->setLaravel($this->app);
 
-        $output = new \Symfony\Component\Console\Output\NullOutput();
-        $command->setOutput(new \Illuminate\Console\OutputStyle(
-            new \Symfony\Component\Console\Input\ArrayInput([]),
+        $output = new NullOutput;
+        $command->setOutput(new OutputStyle(
+            new ArrayInput([]),
             $output
         ));
 
