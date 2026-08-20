@@ -19,7 +19,7 @@
 
             {{-- Logo --}}
             <div class="relative mb-8">
-                <a href="{{ route(config('ui-kit.brand.home_route')) }}" wire:navigate class="flex items-center gap-3">
+                <a href="{{ \Shipbytes\UiKit\Support\UiKit::homeUrl() }}" wire:navigate class="flex items-center gap-3">
                     <img src="{{ asset(config('ui-kit.brand.logo')) }}" class="h-8 w-auto" alt="{{ config('ui-kit.brand.name') }}">
                     <span class="font-boldtext text-xl tracking-tight text-gray-950">{{ config('ui-kit.brand.name') }}</span>
                 </a>

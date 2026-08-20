@@ -27,7 +27,9 @@ class UiKitServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadViewsFrom(__DIR__.'/../stubs/core/views', 'ui-kit');
+        // Package-namespace views (ui-kit::…) live in resources/views and are
+        // NOT published — consumers override them via views/vendor/ui-kit/.
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'ui-kit');
 
         Blade::component('ui-kit::head', UiKitHead::class);
         Blade::component('ui-kit::banners', UiKitBanners::class);
@@ -48,12 +50,19 @@ class UiKitServiceProvider extends ServiceProvider
 
     /**
      * Load the kit's published route files automatically so host apps don't
-     * need to edit bootstrap/app.php. If a consumer wants to disable this
-     * (e.g. to fully customize routing), just delete the relevant route file —
-     * the provider no-ops when they aren't present.
+     * need to edit bootstrap/app.php.
+     *
+     * Only files carrying the "ui-kit:managed" header are loaded — a
+     * routes/auth.php that predates the kit (Breeze, hand-rolled) is left
+     * alone so it never gets registered twice. Consumers opt out by deleting
+     * the header line (or the file).
      */
     protected function registerRoutes(): void
     {
+        if ($this->app->routesAreCached()) {
+            return;
+        }
+
         $files = [
             base_path('routes/auth.php'),
             base_path('routes/admin.php'),
@@ -61,9 +70,17 @@ class UiKitServiceProvider extends ServiceProvider
         ];
 
         foreach ($files as $file) {
-            if (file_exists($file)) {
-                Route::middleware('web')->group($file);
+            if (! file_exists($file)) {
+                continue;
             }
+
+            $contents = (string) file_get_contents($file);
+
+            if (! str_contains($contents, 'ui-kit:managed')) {
+                continue;
+            }
+
+            Route::middleware('web')->group($file);
         }
     }
 
@@ -97,8 +114,23 @@ class UiKitServiceProvider extends ServiceProvider
 
         $this->publishes([
             $core.'/migrations/2024_01_01_000000_add_is_admin_to_users_table.php'
-                => database_path('migrations/'.date('Y_m_d_His').'_add_is_admin_to_users_table.php'),
+                => $this->migrationTarget('add_is_admin_to_users_table'),
         ], 'ui-kit-migrations');
+    }
+
+    /**
+     * Reuse the filename of an already-published copy of a kit migration so
+     * repeated installs don't accumulate freshly-timestamped duplicates.
+     */
+    protected function migrationTarget(string $name): string
+    {
+        $existing = glob(database_path("migrations/*_{$name}.php")) ?: [];
+
+        if ($existing !== []) {
+            return $existing[0];
+        }
+
+        return database_path('migrations/'.date('Y_m_d_His')."_{$name}.php");
     }
 
     protected function registerVoltMountPaths(): void

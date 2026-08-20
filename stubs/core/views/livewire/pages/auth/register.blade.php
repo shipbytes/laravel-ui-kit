@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Shipbytes\UiKit\Support\UiKit;
 
 new #[Layout('layouts.guest')] class extends Component
 {
@@ -37,7 +38,7 @@ new #[Layout('layouts.guest')] class extends Component
 
         Auth::login($user);
 
-        $this->redirectIntended(default: route(config('ui-kit.brand.home_route'), absolute: false), navigate: true);
+        $this->redirectIntended(default: UiKit::homeUrl(), navigate: true);
     }
 }; ?>
 

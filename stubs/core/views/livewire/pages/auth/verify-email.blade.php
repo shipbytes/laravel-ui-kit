@@ -4,13 +4,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Shipbytes\UiKit\Support\UiKit;
 
 new #[Layout('layouts.guest')] class extends Component
 {
     public function sendVerification(): void
     {
         if (Auth::user()->hasVerifiedEmail()) {
-            $this->redirectIntended(default: route(config('ui-kit.brand.home_route'), absolute: false), navigate: true);
+            $this->redirectIntended(default: UiKit::homeUrl(), navigate: true);
 
             return;
         }

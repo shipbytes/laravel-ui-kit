@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Shipbytes\UiKit\Support\UiKit;
 
 new #[Layout('layouts.guest')] class extends Component
 {
@@ -25,7 +26,7 @@ new #[Layout('layouts.guest')] class extends Component
         }
 
         session(['auth.password_confirmed_at' => time()]);
-        $this->redirectIntended(default: route(config('ui-kit.brand.home_route'), absolute: false), navigate: true);
+        $this->redirectIntended(default: UiKit::homeUrl(), navigate: true);
     }
 }; ?>
 

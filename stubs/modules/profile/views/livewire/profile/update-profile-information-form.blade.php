@@ -54,7 +54,10 @@ new class extends Component
             Storage::disk('public')->delete($user->avatar_path);
         }
 
-        $extension = $this->avatar->getClientOriginalExtension() ?: 'jpg';
+        // Derive the extension from the file's actual MIME type — never from
+        // the client-supplied filename, which could smuggle a .php suffix
+        // onto the public disk.
+        $extension = $this->avatar->extension() ?: 'jpg';
         $path = 'avatars/'.$user->getKey().'.'.$extension;
 
         if (class_exists(\Intervention\Image\ImageManager::class)) {
@@ -91,7 +94,7 @@ new class extends Component
         $user = Auth::user();
 
         if ($user->hasVerifiedEmail()) {
-            $this->redirectIntended(default: route('dashboard', absolute: false));
+            $this->redirectIntended(default: \Shipbytes\UiKit\Support\UiKit::homeUrl());
 
             return;
         }

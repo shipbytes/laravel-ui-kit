@@ -114,9 +114,14 @@ trait InstallsModule
     }
 
     /**
-     * Mark a module (or a module:provider pair) as installed in config/ui-kit.php.
+     * Record a module as installed in config/ui-kit.php.
+     *
+     * Patches only the slug list between the ui-kit:modules markers so the
+     * rest of the file — env() calls, comments, consumer edits — survives
+     * untouched. Also updates the in-memory config so later steps in the
+     * same process (trait generation, module listing) see the new state.
      */
-    protected function markInstalled(string $slug, ?string $provider = null): void
+    protected function markInstalled(string $slug): void
     {
         $configPath = config_path('ui-kit.php');
 
@@ -126,18 +131,36 @@ trait InstallsModule
             return;
         }
 
-        $config = require $configPath;
-        $installed = $config['installed_modules'] ?? [];
+        $contents = file_get_contents($configPath);
+        $startMarker = '/* ui-kit:modules-start */';
+        $endMarker = '/* ui-kit:modules-end */';
 
-        if ($provider) {
-            $installed[$slug] = array_values(array_unique(array_merge($installed[$slug] ?? [], [$provider])));
-        } else {
-            $installed[$slug] = $installed[$slug] ?? [];
+        if (! str_contains($contents, $startMarker) || ! str_contains($contents, $endMarker)) {
+            $this->warn('config/ui-kit.php is missing the ui-kit:modules markers; cannot record installed module. Re-publish ui-kit-config (a config published by an older kit version needs the markers added by hand).');
+
+            return;
         }
 
-        $config['installed_modules'] = $installed;
+        $existing = $this->extractMarkerBlock($contents, $startMarker, $endMarker);
 
-        file_put_contents($configPath, "<?php\n\nreturn ".$this->varExport($config).";\n");
+        if (! str_contains($existing, "'{$slug}'")) {
+            $pad = str_repeat(' ', 8);
+            $existingBody = rtrim(ltrim($existing, "\n"));
+            $injected = ($existingBody !== '' ? $existingBody."\n" : '')
+                .$pad."'{$slug}',";
+
+            $replacement = $startMarker."\n".$injected."\n".$pad.$endMarker;
+            $pattern = '/'.preg_quote($startMarker, '/').'.*?'.preg_quote($endMarker, '/').'/s';
+            file_put_contents($configPath, preg_replace($pattern, $replacement, $contents));
+        }
+
+        // Keep the running process in sync — the file alone isn't enough
+        // because config was loaded at boot.
+        $installed = config('ui-kit.installed_modules', []);
+        if (! in_array($slug, $installed, true)) {
+            $installed[] = $slug;
+            config(['ui-kit.installed_modules' => $installed]);
+        }
     }
 
     protected function varExport(mixed $value, int $indent = 0): string
@@ -179,8 +202,8 @@ trait InstallsModule
     protected function generateUiKitUserTrait(): void
     {
         $installed = config('ui-kit.installed_modules', []);
-        $hasAdmin = array_key_exists('admin-middleware', $installed);
-        $hasImpersonate = array_key_exists('impersonation', $installed);
+        $hasAdmin = in_array('admin-middleware', $installed, true);
+        $hasImpersonate = in_array('impersonation', $installed, true);
 
         if (! $hasAdmin && ! $hasImpersonate) {
             return; // no relevant modules → no trait needed
@@ -316,7 +339,13 @@ PHP;
             $rendered .= "        ".$this->varExport($entry, 2).",\n";
         }
 
-        $replacement = $startMarker."\n".rtrim($rendered, "\n")."\n        ".$endMarker;
+        // Preserve whatever earlier installs put between the markers — the
+        // block is replaced wholesale, so dropping the existing body would
+        // wipe other modules' nav entries.
+        $existingBody = rtrim(ltrim($this->extractMarkerBlock($contents, $startMarker, $endMarker), "\n"));
+        $injected = ($existingBody !== '' ? $existingBody."\n" : '').rtrim($rendered, "\n");
+
+        $replacement = $startMarker."\n".$injected."\n        ".$endMarker;
         $pattern = '/'.preg_quote($startMarker, '/').'.*?'.preg_quote($endMarker, '/').'/s';
         $patched = preg_replace($pattern, $replacement, $contents);
 
@@ -399,8 +428,9 @@ PHP;
             return;
         }
 
-        $existingTrim = trim($existing);
-        $injected = ($existingTrim !== '' ? $existingTrim."\n" : '')
+        // ltrim only newlines so the first existing line keeps its indentation.
+        $existingBody = rtrim(ltrim($existing, "\n"));
+        $injected = ($existingBody !== '' ? $existingBody."\n" : '')
             .implode("\n", $toInject);
 
         $replacement = $startMarker."\n".$injected."\n".$pad.$endMarker;

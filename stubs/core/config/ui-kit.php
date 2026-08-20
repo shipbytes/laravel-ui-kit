@@ -67,8 +67,12 @@ return [
     | Installed modules (managed by ui-kit:install-module)
     |--------------------------------------------------------------------------
     |
-    | Do not edit by hand unless you know what you're doing.
+    | The installer records module slugs between the markers below. Do not
+    | edit by hand unless you know what you're doing.
     */
 
-    'installed_modules' => [],
+    'installed_modules' => [
+        /* ui-kit:modules-start */
+        /* ui-kit:modules-end */
+    ],
 ];

@@ -83,7 +83,7 @@
 
                         {{-- Footer --}}
                         <div class="border-t border-zinc-950/5 dark:border-white/5 p-2">
-                            <a href="{{ route(config('ui-kit.brand.home_route')) }}" wire:navigate
+                            <a href="{{ \Shipbytes\UiKit\Support\UiKit::homeUrl() }}" wire:navigate
                                :class="$store.sidebar.collapsed ? 'size-8 p-2 justify-center' : 'w-full gap-3 px-2 py-2'"
                                class="flex items-center rounded-lg text-sm font-medium text-zinc-600 hover:bg-zinc-950/5 dark:text-zinc-300 dark:hover:bg-white/5">
                                 <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>

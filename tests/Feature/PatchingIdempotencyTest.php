@@ -60,6 +60,31 @@ class PatchingIdempotencyTest extends TestCase
         $this->assertSame(1, $countSecond, 'second patch must not duplicate');
     }
 
+    public function test_admin_nav_patch_preserves_entries_from_other_modules(): void
+    {
+        $command = $this->makeCommand();
+
+        // Install support-tickets' nav entry first, then contacts'. The block
+        // between the markers is replaced wholesale, so the second patch must
+        // carry the first module's entry forward instead of wiping it.
+        $this->invoke($command, 'patchAdminNav', [[
+            ['label' => 'Support', 'route' => 'admin.support.index', 'icon' => 'ticket'],
+        ]]);
+        $this->invoke($command, 'patchAdminNav', [[
+            ['label' => 'Contacts', 'route' => 'admin.contacts.index', 'icon' => 'mail'],
+        ]]);
+
+        $contents = file_get_contents($this->configDir.'/admin.php');
+
+        $this->assertStringContainsString('admin.support.index', $contents, 'earlier module nav entry was wiped by a later install');
+        $this->assertStringContainsString('admin.contacts.index', $contents);
+
+        $parsed = require $this->configDir.'/admin.php';
+        $routes = array_column(array_filter($parsed['nav'], fn ($i) => isset($i['route'])), 'route');
+        $this->assertContains('admin.support.index', $routes);
+        $this->assertContains('admin.contacts.index', $routes);
+    }
+
     public function test_admin_routes_patch_is_idempotent(): void
     {
         $command = $this->makeCommand();

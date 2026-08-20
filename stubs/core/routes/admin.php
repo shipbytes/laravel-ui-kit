@@ -1,5 +1,8 @@
 <?php
 
+// ui-kit:managed — auto-loaded by UiKitServiceProvider. Delete this line to
+// opt out of auto-loading and wire this file up yourself.
+
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Users\UserList;
 use App\Livewire\Admin\Users\UserDetail;

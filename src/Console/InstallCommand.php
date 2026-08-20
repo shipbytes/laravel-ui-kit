@@ -189,21 +189,28 @@ class InstallCommand extends Command
         }
 
         $contents = file_get_contents($path);
+        $patched = $contents;
 
-        if (str_contains($contents, "'views' => true")) {
-            file_put_contents($path, str_replace("'views' => true", "'views' => false", $contents));
+        if (str_contains($patched, "'views' => true")) {
+            $patched = str_replace("'views' => true", "'views' => false", $patched);
             $this->line('  ✓ patched <info>fortify.php</info> <comment>views=false</comment> (kit supplies its own auth routes)');
-
-            return;
-        }
-
-        if (str_contains($contents, "'views' => false")) {
+        } elseif (str_contains($patched, "'views' => false")) {
             $this->line('  ✓ <info>fortify.php</info> already has views=false');
-
-            return;
+        } else {
+            warning("Couldn't find a `views` flag in config/fortify.php. Set it to false manually so Fortify doesn't collide with the kit's auth routes.");
         }
 
-        warning("Couldn't find a `views` flag in config/fortify.php. Set it to false manually so Fortify doesn't collide with the kit's auth routes.");
+        // Fortify's default 'home' (/home) doesn't exist on a fresh app and
+        // is where Fortify-driven redirects (e.g. after a 2FA challenge)
+        // land. Point it at the app root instead.
+        if (str_contains($patched, "'home' => '/home'")) {
+            $patched = str_replace("'home' => '/home'", "'home' => '/'", $patched);
+            $this->line('  ✓ patched <info>fortify.php</info> <comment>home=/</comment>');
+        }
+
+        if ($patched !== $contents) {
+            file_put_contents($path, $patched);
+        }
     }
 
     /**
@@ -215,6 +222,18 @@ class InstallCommand extends Command
     {
         $hasJetstream = $this->composerHas('laravel/jetstream');
         $hasBreeze = $this->composerHas('laravel/breeze');
+
+        // A routes/auth.php carrying the kit's managed header means we
+        // published it — this run is an update, not a collision with foreign
+        // auth scaffolding. Skip the warnings so re-runs stay non-interactive.
+        $authFile = base_path('routes/auth.php');
+        if (! $hasJetstream && ! $hasBreeze
+            && file_exists($authFile)
+            && str_contains((string) file_get_contents($authFile), 'ui-kit:managed')) {
+            note('Existing UI Kit install detected — updating in place. Existing files are kept unless --force is passed.');
+
+            return null;
+        }
 
         $fileCollisions = array_values(array_filter([
             'routes/auth.php',

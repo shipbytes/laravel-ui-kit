@@ -157,6 +157,6 @@ class ModuleRegistry
 
     public function isInstalled(string $slug): bool
     {
-        return array_key_exists($slug, config('ui-kit.installed_modules', []));
+        return in_array($slug, config('ui-kit.installed_modules', []), true);
     }
 }
