@@ -6,6 +6,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Laravel\Prompts\Prompt;
 use Shipbytes\UiKit\Support\InstallQueue;
+use Symfony\Component\Process\Process;
 
 trait InstallsModule
 {
@@ -541,27 +542,60 @@ PHP;
     {
         foreach (InstallQueue::$vendorPublishes as $argsJson) {
             $args = (array) json_decode($argsJson, true);
-            Artisan::call('vendor:publish', $args);
+            $this->runArtisan('vendor:publish', $args);
             $label = $args['--provider'] ?? ($args['--tag'] ?? 'vendor:publish');
             $this->line("  ✓ published <info>{$label}</info>");
         }
 
         if (InstallQueue::$migrate) {
             $this->line('  · migrating database...');
-            Artisan::call('migrate', ['--force' => true]);
+            $this->runArtisan('migrate', ['--force' => true]);
             $this->line('  ✓ <info>migrate</info> done');
         }
 
         foreach (InstallQueue::$seeders as $class) {
-            Artisan::call('db:seed', ['--class' => $class, '--force' => true]);
+            $this->runArtisan('db:seed', ['--class' => $class, '--force' => true]);
             $this->line("  ✓ seeded <info>{$class}</info>");
         }
 
         if (InstallQueue::$storageLink) {
-            Artisan::call('storage:link');
+            $this->runArtisan('storage:link');
             $this->line('  ✓ <info>storage:link</info> created');
         }
 
         $this->resetDeferred();
+    }
+
+    /**
+     * Run an artisan command in-process — or in a fresh `php artisan`
+     * subprocess when this run composer-required new packages. The current
+     * process's autoloader predates those packages, so their service
+     * providers, migrations, and classes only exist in a fresh process.
+     *
+     * @param  array<string, string|bool>  $options
+     */
+    protected function runArtisan(string $command, array $options = []): void
+    {
+        if (InstallQueue::$composerChanged && file_exists(base_path('artisan'))) {
+            $argv = [PHP_BINARY, base_path('artisan'), $command, '--no-interaction'];
+
+            foreach ($options as $key => $value) {
+                $argv[] = $value === true ? $key : $key.'='.$value;
+            }
+
+            $process = new Process($argv, base_path());
+            $process->setTimeout(600);
+            $process->run(function ($type, $buffer) {
+                $this->output->write($buffer);
+            });
+
+            if (! $process->isSuccessful()) {
+                $this->warn("`php artisan {$command}` exited non-zero — run it again manually.");
+            }
+
+            return;
+        }
+
+        Artisan::call($command, $options);
     }
 }

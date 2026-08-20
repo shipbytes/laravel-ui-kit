@@ -22,11 +22,20 @@ final class InstallQueue
 
     public static bool $migrate = false;
 
+    /**
+     * True once this run performed a `composer require`. The current PHP
+     * process keeps its original autoloader, so classes from newly-installed
+     * packages don't exist here — tail commands must then run in a fresh
+     * `php artisan` subprocess.
+     */
+    public static bool $composerChanged = false;
+
     public static function reset(): void
     {
         self::$vendorPublishes = [];
         self::$seeders = [];
         self::$storageLink = false;
         self::$migrate = false;
+        self::$composerChanged = false;
     }
 }

@@ -5,6 +5,7 @@ namespace Shipbytes\UiKit\Console;
 use Composer\InstalledVersions;
 use Illuminate\Console\Command;
 use Shipbytes\UiKit\Console\Concerns\InstallsModule;
+use Shipbytes\UiKit\Support\InstallQueue;
 use Shipbytes\UiKit\Support\ModuleRegistry;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
@@ -154,7 +155,7 @@ class InstallModuleCommand extends Command
 
         $composer = (new ExecutableFinder)->find('composer', 'composer');
 
-        $process = new Process(array_merge([$composer, 'require'], $missing), base_path());
+        $process = new Process(array_merge([$composer, 'require', '--no-interaction'], $missing), base_path());
         $process->setTimeout(null);
         $process->run(function ($type, $buffer) {
             $this->output->write($buffer);
@@ -162,6 +163,12 @@ class InstallModuleCommand extends Command
 
         if (! $process->isSuccessful()) {
             $this->warn('composer require exited non-zero. Re-run `composer require '.implode(' ', $missing).'` manually.');
+
+            return;
         }
+
+        // The running process can't see the new packages — flag the queue so
+        // tail commands run in a fresh subprocess (see runArtisan()).
+        InstallQueue::$composerChanged = true;
     }
 }
