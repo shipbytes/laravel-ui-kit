@@ -2,6 +2,8 @@
 
 Admin panel + auth UI scaffolding for **Laravel 12+** with Livewire 3, Volt, Fortify, and **Tailwind CSS v4**.
 
+**Documentation with screenshots: [shipbytes.dev/docs/laravel-ui-kit](https://shipbytes.dev/docs/laravel-ui-kit).**
+
 Core + 7 optional modules, installed by a turnkey `php artisan ui-kit:install`. CI covers PHP 8.2–8.4 on Laravel 12 (plus an experimental Laravel 13 leg) and runs a full fresh-app install → build → `route:cache` → HTTP smoke on every push. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## What you get
@@ -277,7 +279,7 @@ Inbox for a public contact form that writes to `contact_submissions`. Read/unrea
 Cards under `/profile` (rendered in the user shell, not the admin shell): update info + avatar, update password, two-factor authentication, delete account. Avatars are stored under a content-derived extension and resized to 200×200 when `intervention/image` is installed.
 
 ### `impersonation`
-Two Blade partials over `lab404/laravel-impersonate`. `<x-ui-kit::banners />` shows the exit ribbon automatically; `@include('partials.impersonation-button', ['user' => $user])` renders the login-as button. The generated `UiKitUser` trait provides `canImpersonate()` / `canBeImpersonated()`.
+Two Blade partials over `lab404/laravel-impersonate`. The package ships its routes as a macro, so add `Route::middleware('auth')->group(fn () => Route::impersonate());` to `routes/web.php`; the partials link to `impersonate` and `impersonate.leave`. `<x-ui-kit::banners />` shows the exit ribbon automatically; `@include('partials.impersonation-button', ['user' => $user])` renders the login-as button. The generated `UiKitUser` trait provides `canImpersonate()` / `canBeImpersonated()`.
 
 ### `activity-log`
 Paginated admin viewer over `spatie/laravel-activitylog`. Filters: log stream, causer email, date range. Add the `LogsActivity` trait to models you want logged (see Spatie's docs).

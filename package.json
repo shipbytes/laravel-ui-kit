@@ -1,0 +1,12 @@
+{
+  "name": "laravel-ui-kit-tooling",
+  "private": true,
+  "type": "module",
+  "description": "Developer tooling for shipbytes/laravel-ui-kit. Not published; the package itself is on Packagist.",
+  "scripts": {
+    "screenshots": "node scripts/screenshots.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

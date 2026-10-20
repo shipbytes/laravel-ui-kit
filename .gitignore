@@ -8,3 +8,6 @@ package-lock.json
 Thumbs.db
 /workbench/
 CLAUDE.md
+
+# screenshot harness (scripts/screenshots.mjs)
+/.screenshots-app/
