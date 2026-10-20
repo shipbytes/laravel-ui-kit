@@ -10,6 +10,20 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Added
+
+- **Documentation screenshots.** `npm run screenshots` (scripts/screenshots.mjs)
+  builds a fresh Laravel 12 app with every module, seeds it deterministically
+  and photographs each screen in light and dark mode into `docs/images/`,
+  which shipbytes.dev copies at build time.
+
+### Fixed
+
+- `ContactSubmission` now uses `HasFactory`, so `ContactSubmission::factory()`
+  works as the README promised.
+- README: the impersonation module needs `Route::impersonate()` registered in
+  the app; the partials link to those routes.
+
 ## [0.2.1] - 2026-08-20
 
 ### Added
