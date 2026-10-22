@@ -81,7 +81,9 @@ PHP);
 
         $this->loadLaravelMigrations();
 
-        $this->artisan('ui-kit:install', ['--no-interaction' => true])->assertSuccessful();
+        // The profile module rides along: it has no composer dependency, and
+        // its page is the other half of the screens built on ds:: forms.
+        $this->artisan('ui-kit:install', ['--modules' => 'profile', '--no-interaction' => true])->assertSuccessful();
 
         // The provider booted before anything was published — load the
         // published admin config and wire the routes/views up by hand.
@@ -128,12 +130,92 @@ PHP);
     {
         $this->get('/register')
             ->assertOk()
-            ->assertSee('Create your account');
+            ->assertSee('Create your account')
+            ->assertSee('Create account')
+            ->assertDontSee('<x-ds::', false);
     }
 
     public function test_forgot_password_page_renders(): void
     {
-        $this->get('/forgot-password')->assertOk();
+        $this->get('/forgot-password')
+            ->assertOk()
+            ->assertSee('Send reset link')
+            ->assertDontSee('<x-ds::', false);
+    }
+
+    public function test_reset_password_page_renders(): void
+    {
+        $this->get('/reset-password/some-token?email=someone%40example.com')
+            ->assertOk()
+            ->assertSee('Reset password')
+            ->assertSee('someone@example.com')
+            ->assertDontSee('<x-ds::', false);
+    }
+
+    public function test_verify_email_page_renders_for_an_unverified_user(): void
+    {
+        $user = User::forceCreate([
+            'name' => 'Unverified User',
+            'email' => 'unverified@example.com',
+            'password' => bcrypt('secret'),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/verify-email')
+            ->assertOk()
+            ->assertSee('Resend verification email')
+            ->assertSee('Log out')
+            ->assertDontSee('<x-ds::', false);
+    }
+
+    public function test_confirm_password_page_renders(): void
+    {
+        $user = User::forceCreate([
+            'name' => 'Plain User',
+            'email' => 'plain@example.com',
+            'password' => bcrypt('secret'),
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/confirm-password')
+            ->assertOk()
+            ->assertSee('Confirm')
+            ->assertDontSee('<x-ds::', false);
+    }
+
+    public function test_two_factor_challenge_renders_with_a_staged_login(): void
+    {
+        $this->withSession(['ui-kit.login.id' => 1])
+            ->get('/two-factor-challenge')
+            ->assertOk()
+            ->assertSee('Two-factor authentication')
+            ->assertSee('Use a recovery code instead')
+            ->assertDontSee('<x-ds::', false);
+    }
+
+    public function test_profile_page_renders_its_four_sections(): void
+    {
+        $user = User::forceCreate([
+            'name' => 'Plain User',
+            'email' => 'plain@example.com',
+            'password' => bcrypt('secret'),
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('Profile Information')
+            ->assertSee('Update Password')
+            ->assertSee('Two-Factor Authentication')
+            ->assertSee('Delete Account')
+            // The delete confirmation is the design system's dialog, closed
+            // until Alpine opens it; the kit's own x-modal is gone.
+            ->assertSee('role="dialog"', false)
+            ->assertSee('form="delete-account-form"', false)
+            ->assertDontSee('<x-modal', false)
+            ->assertDontSee('<x-ds::', false);
     }
 
     public function test_two_factor_challenge_redirects_without_staged_login(): void

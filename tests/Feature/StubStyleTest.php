@@ -29,13 +29,6 @@ class StubStyleTest extends TestCase
         'stubs/modules/changelog/views/livewire/admin/changelog/changelog-form.blade.php',
         'stubs/modules/changelog/views/livewire/admin/changelog/changelog-list.blade.php',
         'stubs/modules/contacts/views/livewire/admin/contacts/contact-list.blade.php',
-        'stubs/modules/profile/views/components/action-message.blade.php',
-        'stubs/modules/profile/views/components/modal.blade.php',
-        'stubs/modules/profile/views/livewire/profile/delete-user-form.blade.php',
-        'stubs/modules/profile/views/livewire/profile/profile-page.blade.php',
-        'stubs/modules/profile/views/livewire/profile/two-factor-authentication-form.blade.php',
-        'stubs/modules/profile/views/livewire/profile/update-password-form.blade.php',
-        'stubs/modules/profile/views/livewire/profile/update-profile-information-form.blade.php',
         'stubs/modules/support-tickets/views/livewire/admin/support/ticket-detail.blade.php',
         'stubs/modules/support-tickets/views/livewire/admin/support/ticket-list.blade.php',
     ];
