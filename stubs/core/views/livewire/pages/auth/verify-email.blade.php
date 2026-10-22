@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Layout;
-use Livewire\Volt\Component;
+use Livewire\Component;
 use Shipbytes\UiKit\Support\UiKit;
 
 new #[Layout('layouts.guest')] class extends Component

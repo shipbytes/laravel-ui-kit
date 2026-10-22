@@ -2,6 +2,7 @@
 
 namespace Shipbytes\UiKit\Console;
 
+use Composer\InstalledVersions;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -20,6 +21,7 @@ class DoctorCommand extends Command
     public function handle(): int
     {
         $this->checkPublishedFiles();
+        $this->checkLivewire();
         $this->checkFortify();
         $this->checkViteWiring();
         $this->checkUserTrait();
@@ -88,6 +90,85 @@ class DoctorCommand extends Command
                 $this->skipCheck("{$file} auto-loaded", 'no ui-kit:managed header — load it yourself or re-publish');
             }
         }
+    }
+
+    /**
+     * 0.3 moved the kit from Livewire 3 + Volt to Livewire 4. An app upgraded
+     * from 0.2 keeps booting through the VoltCompat shim, so these checks are
+     * what tell the user the migration is unfinished.
+     */
+    protected function checkLivewire(): void
+    {
+        // version_compare on the normalized version rather than
+        // InstalledVersions::satisfies(): that needs composer/semver, which a
+        // host app doesn't necessarily have installed.
+        $version = InstalledVersions::isInstalled('livewire/livewire')
+            ? (string) InstalledVersions::getVersion('livewire/livewire')
+            : '';
+
+        if (version_compare($version, '4.0.0.0-dev', '>=') && version_compare($version, '5.0.0.0-dev', '<')) {
+            $this->passCheck('Livewire 4 installed');
+        } else {
+            $this->failCheck('Livewire 4 installed', 'composer require livewire/livewire:^4.0');
+        }
+
+        $routes = base_path('routes/auth.php');
+
+        if (! file_exists($routes)) {
+            $this->skipCheck('routes/auth.php uses Route::livewire', 'routes/auth.php not published');
+        } elseif (str_contains((string) file_get_contents($routes), 'Volt::')) {
+            $this->failCheck('routes/auth.php uses Route::livewire', 'in routes/auth.php replace `Volt::route(` with `Route::livewire(` and delete the `use Livewire\Volt\Volt;` line. The kit\'s Volt shim keeps the old file working until then.');
+        } else {
+            $this->passCheck('routes/auth.php uses Route::livewire');
+        }
+
+        $this->checkVoltViews();
+
+        $providers = base_path('bootstrap/providers.php');
+        $listed = file_exists($providers) && str_contains((string) file_get_contents($providers), 'VoltServiceProvider');
+
+        if ($listed || file_exists(app_path('Providers/VoltServiceProvider.php'))) {
+            $this->failCheck('no Volt service provider', 'remove VoltServiceProvider from bootstrap/providers.php, delete app/Providers/VoltServiceProvider.php, then composer remove livewire/volt');
+        } else {
+            $this->passCheck('no Volt service provider');
+        }
+    }
+
+    protected function checkVoltViews(): void
+    {
+        $dir = resource_path('views/livewire');
+
+        if (! is_dir($dir)) {
+            $this->skipCheck('views free of Volt imports', 'resources/views/livewire does not exist');
+
+            return;
+        }
+
+        $offending = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS));
+
+        foreach ($files as $file) {
+            /** @var \SplFileInfo $file */
+            if (str_ends_with($file->getFilename(), '.blade.php')
+                && str_contains((string) file_get_contents($file->getPathname()), 'Livewire\Volt')) {
+                $offending[] = 'resources/views/livewire/'.str_replace('\\', '/', substr($file->getPathname(), strlen($dir) + 1));
+            }
+        }
+
+        if ($offending === []) {
+            $this->passCheck('views free of Volt imports');
+
+            return;
+        }
+
+        sort($offending);
+        $listed = implode(', ', array_slice($offending, 0, 5));
+
+        if (count($offending) > 5) {
+            $listed .= ' and '.(count($offending) - 5).' more';
+        }
+
+        $this->failCheck('views free of Volt imports', "replace `use Livewire\\Volt\\Component;` with `use Livewire\\Component;` in {$listed}");
     }
 
     protected function checkFortify(): void

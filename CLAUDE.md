@@ -1,7 +1,7 @@
 # Laravel UI Kit — working notes
 
 `shipbytes/laravel-ui-kit` on Packagist. Auth pages, working 2FA and a config-driven admin
-shell for Laravel 12 (Livewire 3, Volt, Fortify, Tailwind v4): a core plus seven optional
+shell for Laravel 12 (Livewire 4, Fortify, Tailwind v4): a core plus seven optional
 modules, installed by `php artisan ui-kit:install`. The documentation people read is
 **https://shipbytes.dev/docs/laravel-ui-kit**, and most of it is NOT in this repo (see
 "The docs site" below). Never name the application this was extracted from.
