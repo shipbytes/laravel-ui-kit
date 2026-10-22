@@ -1,8 +1,9 @@
 # Laravel UI Kit — working notes
 
 `shipbytes/laravel-ui-kit` on Packagist. Auth pages, working 2FA and a config-driven admin
-shell for Laravel 12 (Livewire 4, Fortify, Tailwind v4): a core plus seven optional
-modules, installed by `php artisan ui-kit:install`. The documentation people read is
+shell for Laravel 12 (Livewire 4, Fortify, Tailwind v4, styled entirely by the Shipbytes
+design system `shipbytes/blade-ui`): a core plus seven optional modules, installed by
+`php artisan ui-kit:install`. The documentation people read is
 **https://shipbytes.dev/docs/laravel-ui-kit**, and most of it is NOT in this repo (see
 "The docs site" below). Never name the application this was extracted from.
 
@@ -13,10 +14,14 @@ src/Console/            the Artisan commands; InstallModuleCommand applies the r
                         DoctorCommand verifies an install
 src/Support/ModuleRegistry.php
                         the ONE place a module says what installing it must do
-resources/, routes/     what gets published into the app; the route stubs carry
-                        /* ui-kit:...-start/end */ markers the installer patches between
-tests/                  PHPUnit incl. ModuleRegistryTest, PatchingIdempotencyTest and an
-                        end-to-end installer test
+stubs/core, stubs/modules
+                        what gets published into the app; the route stubs carry
+                        /* ui-kit:...-start/end */ markers the installer patches between.
+                        css/ui-kit.css imports the design system's tokens.css + theme.css
+                        and @source's its views; the kit has no theme file of its own
+resources/views/        the package's own components (<x-ui-kit::head />, banners)
+tests/                  PHPUnit incl. ModuleRegistryTest, PatchingIdempotencyTest,
+                        StubStyleTest and an end-to-end installer test
 scripts/screenshots.mjs builds a fresh app, seeds it, photographs every screen
 docs/images/            the screenshots, COMMITTED (<screen>-light.png / -dark.png)
 CHANGELOG.md            Keep a Changelog; the site renders it
@@ -51,7 +56,17 @@ Do not merge anything red, and prefer a branch + PR so that job runs before mast
 3. **A module is not done until:** registry entry, tests, README section under
    "Module deep-dives", a `CHANGELOG.md` entry under `[Unreleased]`, fresh screenshots if a
    screen changed, and the matching page on the docs site (below). Same change series.
-4. **Screenshots are the proof.** Re-run `npm run screenshots` whenever a screen's look
+4. **All styling goes through the design system.** Stubs use `ds::` components and its
+   semantic tokens (`bg-surface`, `text-fg-muted`, `border-border`, `rounded-panel`…):
+   no palette classes (`zinc-500`, `indigo-600`), no `dark:` variants (the tokens flip
+   themselves), no inline `<svg>` (use `ds::icon` with a Heroicons v2 name), no raw form
+   controls. `StubStyleTest` enforces it. When the design system lacks something or a
+   component's API fights a layout, fix it upstream (repo `shipbytes/design-system`,
+   package `shipbytes/blade-ui`), tag it, bump the constraint here; never work around it
+   in a stub. Read `vendor/shipbytes/blade-ui/CLAUDE.md` before using a component: most
+   of its traps (icon is a slot, `open` must be assignable, the `@source` line) fail
+   silently.
+5. **Screenshots are the proof.** Re-run `npm run screenshots` whenever a screen's look
    changes and commit the PNGs. The site shows `<name>-light.png` and `<name>-dark.png` as a
    pair through its `<Screenshot name="…">` component, so keep the naming.
 

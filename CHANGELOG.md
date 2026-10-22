@@ -10,6 +10,74 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+The start of 0.4.0: the kit moves onto the Shipbytes design system. This
+first step covers the layouts and the shared components; the auth, profile and
+admin screens inside them still use the 0.3 styling and are restyled before
+0.4.0 ships.
+
+### Changed
+
+- **Breaking: built on the Shipbytes design system (`shipbytes/blade-ui`).**
+  The kit no longer carries a palette, fonts or components of its own. The
+  admin shell, the user shell, the guest layout, the theme toggle, the session
+  status message and the impersonation ribbon and button now use `ds::`
+  components and the design system's semantic tokens (`bg-surface`,
+  `text-fg-muted`, `border-border`, …), which switch for dark mode on their
+  own. The phone's "More" menu is the design system's bottom sheet. The
+  accent colour is the design system's blue, and its Inter is the one font
+  the layouts load.
+  Composer installs `shipbytes/blade-ui` with the kit. The
+  published `resources/css/ui-kit.css` imports its `tokens.css` and `theme.css`
+  and adds the `@source` line Tailwind needs to see its components, so
+  `app.css` still imports only `./ui-kit.css`. To upgrade a 0.3 app:
+  1. `composer require shipbytes/laravel-ui-kit:^0.4 -W`.
+  2. `php artisan vendor:publish --tag=ui-kit-assets --force` to replace
+     `resources/css/ui-kit.css` and `resources/js/ui-kit.js`, and
+     `php artisan vendor:publish --tag=ui-kit-views --force` to replace the
+     layouts (back up any of these you edited first).
+  3. Delete `resources/css/ui-kit-theme.css`.
+  4. Move any token overrides you made there into `resources/css/app.css`,
+     after the `ui-kit.css` import, as `--ds-*` variables, e.g.
+     `:root { --ds-accent: … }`. `brand-*`, `font-boldtext` and
+     `font-booktext` classes in your own views no longer exist.
+  5. In `config/admin.php`, rename every nav `icon` to a
+     [Heroicons v2](https://heroicons.com) outline name. This includes the
+     kit's own entries, which the installer does not rewrite once they exist:
+     `grid` → `squares-2x2`, `note` → `document-text`, `mail` → `envelope`,
+     `chart` → `chart-bar`, `history` → `clock`; `users`, `ticket`, `clock`
+     and `user-circle` stay as they are.
+  6. `php artisan ui-kit:doctor`. Every row should pass.
+- **Nav icons are Heroicons v2 names**, rendered through `ds::icon`, so any of
+  the outline icons on heroicons.com works in `config/admin.php`.
+  The kit's own entries are now `squares-2x2` (Dashboard), `users`, `ticket`,
+  `document-text` (Changelog), `envelope` (Contacts) and `clock` (Activity).
+- **The theme follows the OS until the user picks one.** With nothing stored,
+  the theme store and the no-flash snippet now take the initial theme from
+  `prefers-color-scheme`. Before, it was always light. They also set exactly
+  one of `light` / `dark` on `<html>`: the design system's tokens follow the
+  OS whenever neither class is present, so a dark-OS user who chose light
+  would otherwise have got dark tokens.
+
+### Added
+
+- `ui-kit:doctor` checks for the design system: `design system installed`,
+  `ui-kit.css imports the design system`, `no leftover ui-kit-theme.css` and
+  `nav icons are Heroicons` (it lists each `label => icon` that doesn't
+  resolve). Each failing row says how to fix it.
+- `StubStyleTest`: the suite now fails when a published view uses a raw
+  palette class, a `dark:` variant, an inline `<svg>` or a raw form control
+  instead of the design system. Screens that haven't been moved over yet are
+  on an explicit allowlist that the rest of the 0.4.0 work empties.
+
+### Removed
+
+- `resources/css/ui-kit-theme.css` and its `@theme` block: the `brand-*`
+  palette and the Poppins (`font-boldtext`) and Montserrat (`font-booktext`)
+  font utilities. The layouts load only Inter.
+- The kit's own `@custom-variant dark`, `[x-cloak]` and `.safe-area-bottom`
+  rules. The design system's `theme.css` provides all three.
+- The `layouts/partials/nav-icons` partial and its hand-drawn icons.
+
 ## [0.3.0] - 2026-10-22
 
 ### Changed

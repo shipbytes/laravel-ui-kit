@@ -15,8 +15,8 @@ Core + 7 optional modules, installed by a turnkey `php artisan ui-kit:install`. 
 - **Admin shell** — collapsible sidebar, mobile bottom nav, theme toggle, current-user footer with profile link + logout; nav is config-driven from `config/admin.php`
 - **User shell** — a light authenticated layout (`layouts/user-shell`) used by user-facing pages like `/profile`
 - **Dashboard stub + Users list/detail**
-- **Tailwind v4 theme** — CSS-first `@theme` tokens (brand palette, Inter/Poppins/Montserrat font utilities) and a class-strategy `dark:` variant
-- **Alpine stores** — sidebar collapse (localStorage-persisted), theme toggle with no-flash snippet
+- **Built on the Shipbytes design system** — every layout uses [`shipbytes/blade-ui`](https://shipbytes.dev/docs/design-system) (`ds::` Blade components, semantic tokens that switch for dark mode on their own, Heroicons v2); it comes with the kit, so there's no separate install step
+- **Alpine stores** — sidebar collapse (localStorage-persisted), theme toggle with no-flash snippet (follows the OS until the user picks a theme)
 - **`ui-kit:doctor`** — a health check that verifies the install is fully wired
 
 ### Optional modules
@@ -56,7 +56,7 @@ When the Laravel installer prompts you:
 | Prompt | Pick | Why |
 | --- | --- | --- |
 | Starter kit | **None** | The kit *is* the auth/admin scaffolding — every starter kit (Breeze-style Livewire, React, Vue) collides with it. |
-| Frontend stack | **Blade** | Gives you plain Vite + Tailwind CSS v4, which the kit's `@theme` file plugs straight into. Livewire 4 arrives via Composer with the kit itself. |
+| Frontend stack | **Blade** | Gives you plain Vite + Tailwind CSS v4, which the kit's stylesheet (and the design system it imports) plugs straight into. Livewire 4 arrives via Composer with the kit itself. |
 | Testing framework | Pest or PHPUnit | No interaction with the kit — pick your preference. |
 | Database | Any (the SQLite default is fine) | The kit's migrations run on anything Laravel supports. |
 | Run `npm install` / migrations | Yes | The kit's Vite wiring expects `resources/css/app.css` and `resources/js/app.js` to exist, and its installer migrates on top of the base tables. |
@@ -163,7 +163,7 @@ composer update shipbytes/laravel-ui-kit
    `admin-middleware` module is installed and sets the `is_admin` flag when the
    column exists — whichever mechanisms are present.
 
-3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table (published files, Livewire 4 migration (Livewire version, `Route::livewire` in routes/auth.php, no Volt imports in views, no Volt service provider), Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
+3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table (published files, Livewire 4 migration (Livewire version, `Route::livewire` in routes/auth.php, no Volt imports in views, no Volt service provider), Fortify flags, Vite imports, design system (package installed, `ui-kit.css` imports it, no leftover `ui-kit-theme.css`, nav icons are Heroicons names), trait applied, storage link, 2FA columns, duplicate route names, mail config).
 
 > The `UiKitUser` trait used to be a manual step here — the installer now
 > applies it to `app/Models/User.php` itself and only asks you to do it by
@@ -196,25 +196,45 @@ If your app has its own master layout for public pages, drop the kit's head/bann
 
 Drop a logo at `public/images/logo.png` (or point `UI_KIT_BRAND_LOGO` anywhere, including a full URL). Until a logo exists the layouts render an initial badge, so nothing looks broken on a fresh install. `home_route` names the route used for "back to site" links and post-login redirects — **when the route doesn't exist the kit falls back to `/`**, so fresh apps work without defining one.
 
-### Tailwind theme
+### Design system
 
-The design tokens live in `resources/css/ui-kit-theme.css` (Tailwind v4 `@theme`):
+The kit's views are built on the [Shipbytes design system](https://shipbytes.dev/docs/design-system)
+(`shipbytes/blade-ui`): `ds::` Blade components and semantic tokens such as
+`bg-surface`, `text-fg-muted` and `border-border`. Composer installs it with the
+kit, and the one line the installer adds to `resources/css/app.css` is all the
+wiring it needs:
 
 ```css
-@theme {
-    --color-brand-500: #6366f1;   /* bg-brand-500, text-brand-600, … */
-    --font-boldtext: 'Poppins', ui-sans-serif, system-ui, sans-serif;
-}
+@import 'tailwindcss';
+@import './ui-kit.css';
 ```
 
-Override any token in your own CSS after the import — last definition wins. Dark mode uses a `dark` class on `<html>` (toggled by `<x-theme-toggle />`, persisted to localStorage, no-flash on load).
+`resources/css/ui-kit.css` imports the design system's `tokens.css` and
+`theme.css` and carries the `@source` line that lets Tailwind see the classes
+its components use. Don't remove that line: Tailwind doesn't scan `vendor/`, so
+without it every component renders unstyled and nothing reports an error.
+
+To change a token (the accent colour, say), redefine its `--ds-*` variable in
+`app.css` **after** the `ui-kit.css` import:
+
+```css
+@import './ui-kit.css';
+
+:root { --ds-accent: oklch(55% 0.2 150); }
+.dark { --ds-accent: oklch(72% 0.17 150); }
+```
+
+The design system's docs list every token and component. Dark mode is a `dark`
+or `light` class on `<html>`, set by `<x-theme-toggle />` and the no-flash
+snippet. When the user hasn't picked a theme, it follows the OS setting;
+picking one stores it in localStorage.
 
 ### Sidebar navigation
 
 ```php
 // config/admin.php
 'nav' => [
-    ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'grid'],
+    ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'squares-2x2'],
     ['label' => 'Users', 'route' => 'admin.users.index', 'icon' => 'users'],
     ['section' => 'Support'],
     ['label' => 'Tickets', 'route' => 'admin.support.index', 'icon' => 'ticket', 'badge' => 'open_tickets'],
@@ -222,6 +242,7 @@ Override any token in your own CSS after the import — last definition wins. Da
 ```
 
 Modules append their own entries automatically between the `/* ui-kit:nav-* */` markers.
+`icon` is a [Heroicons v2](https://heroicons.com) outline name (`squares-2x2`, `document-text`, `envelope`…), rendered through `ds::icon`; `ui-kit:doctor` flags any that don't resolve.
 
 ### Sidebar badges
 
@@ -314,6 +335,7 @@ Run `php artisan ui-kit:doctor` first — it catches the common ones and prints 
 - **"Unauthorized" on `/admin`** — the fallback middleware requires `$user->is_admin` to be truthy; with `admin-middleware` installed you need the `admin` role assigned.
 - **Sidebar badges show 0 / blank** — bind your own `SidebarBadgeResolver`; the default returns an empty array.
 - **`Class "Livewire\Volt\Volt" not found` or a leftover `VoltServiceProvider` after upgrading from 0.2** — finish the Livewire 4 migration: the doctor's Livewire rows print each step, and the Livewire 4 entry in `CHANGELOG.md` lists them.
+- **Components render as unstyled HTML, or nav rows have no icons, after upgrading from 0.3** — re-publish `ui-kit-assets --force`, delete `resources/css/ui-kit-theme.css` and rename custom nav icons to Heroicons names; the doctor's design-system rows say which applies, and the 0.4.0 entry in `CHANGELOG.md` lists the steps.
 - **`route:cache` fails with a duplicate name** — the doctor lists the duplicates; usually a route file was copied without its `ui-kit:managed` header and loaded twice by hand.
 - **The welcome page's "Dashboard" button 404s** — that button is stock Laravel and links to `/dashboard`, which nothing registers. The kit's panel is at `/admin`; edit `resources/views/welcome.blade.php` to point there (or replace the page).
 
