@@ -279,7 +279,7 @@ Inbox for a public contact form that writes to `contact_submissions`. Read/unrea
 Cards under `/profile` (rendered in the user shell, not the admin shell): update info + avatar, update password, two-factor authentication, delete account. Avatars are stored under a content-derived extension and resized to 200×200 when `intervention/image` is installed.
 
 ### `impersonation`
-Two Blade partials over `lab404/laravel-impersonate`. The package ships its routes as a macro, so add `Route::middleware('auth')->group(fn () => Route::impersonate());` to `routes/web.php`; the partials link to `impersonate` and `impersonate.leave`. `<x-ui-kit::banners />` shows the exit ribbon automatically; `@include('partials.impersonation-button', ['user' => $user])` renders the login-as button. The generated `UiKitUser` trait provides `canImpersonate()` / `canBeImpersonated()`.
+Two Blade partials over `lab404/laravel-impersonate`. The package ships its routes as a macro; the installer calls it for you by adding `Route::impersonate();` to `routes/ui-kit-user.php` (web + auth), which registers `impersonate` and `impersonate.leave`. `ui-kit:doctor` checks both routes exist. `<x-ui-kit::banners />` shows the exit ribbon automatically; `@include('partials.impersonation-button', ['user' => $user])` renders the login-as button. The generated `UiKitUser` trait provides `canImpersonate()` / `canBeImpersonated()`.
 
 ### `activity-log`
 Paginated admin viewer over `spatie/laravel-activitylog`. Filters: log stream, causer email, date range. Add the `LogsActivity` trait to models you want logged (see Spatie's docs).

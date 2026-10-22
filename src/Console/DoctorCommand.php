@@ -155,6 +155,14 @@ class DoctorCommand extends Command
     {
         $installed = config('ui-kit.installed_modules', []);
 
+        if (in_array('impersonation', $installed, true)) {
+            if (Route::has('impersonate') && Route::has('impersonate.leave')) {
+                $this->passCheck('impersonation routes registered');
+            } else {
+                $this->failCheck('impersonation routes registered', 'add `Route::impersonate();` between the ui-kit:user-routes markers in routes/ui-kit-user.php, or re-run php artisan ui-kit:install-module impersonation');
+            }
+        }
+
         if (! in_array('profile', $installed, true)) {
             return;
         }

@@ -58,13 +58,6 @@ copyFileSync(join(ROOT, 'scripts/screenshots/ScreenshotSeeder.php'), join(APP, '
 if (!existsSync(join(APP, 'database/database.sqlite'))) writeFileSync(join(APP, 'database/database.sqlite'), '')
 run('php', ['artisan', 'migrate:fresh', '--force', '--seed', '--seeder=ScreenshotSeeder', '--no-interaction'], { cwd: APP })
 
-// lab404/laravel-impersonate ships its routes as a macro the host app has to call. The kit's
-// partials link to them, so the app needs this line (the impersonation module docs say so).
-const webRoutes = join(APP, 'routes/web.php')
-if (!readFileSync(webRoutes, 'utf8').includes('Route::impersonate()')) {
-  appendFileSync(webRoutes, "\nRoute::middleware('auth')->group(fn () => Route::impersonate());\n")
-}
-
 const routes = JSON.parse(run('php', ['artisan', 'route:list', '--json'], { cwd: APP }))
 const route = (name) => {
   const r = routes.find((x) => x.name === name)

@@ -27,6 +27,15 @@ class ModuleRegistryTest extends TestCase
         }
     }
 
+    public function test_impersonation_module_registers_the_package_routes(): void
+    {
+        $registry = $this->app->make(ModuleRegistry::class);
+
+        // lab404/laravel-impersonate ships its routes as a macro; the installer
+        // has to call it, under auth, or the partials link to nothing.
+        $this->assertSame(['Route::impersonate();'], $registry->get('impersonation')['user_routes']);
+    }
+
     public function test_stub_directories_exist_for_each_module(): void
     {
         $registry = $this->app->make(ModuleRegistry::class);
