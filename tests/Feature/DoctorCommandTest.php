@@ -3,13 +3,19 @@
 namespace Shipbytes\UiKit\Tests\Feature;
 
 use Illuminate\Support\Facades\Artisan;
+use Orchestra\Testbench\Attributes\UsesVendor;
 use Shipbytes\UiKit\Tests\TestCase;
 
 /**
  * The upgrade checks. A 0.2-era app keeps booting through the Volt shim, and a
  * 0.3-era app keeps compiling its old ui-kit.css, so in both cases the doctor
  * is what reports the unfinished upgrade.
+ *
+ * UsesVendor links the package's vendor/ into the Testbench skeleton, the way
+ * a real app has one, because the design-system rows look for the package
+ * and its icons at base_path('vendor/…'), where the published CSS imports them.
  */
+#[UsesVendor]
 class DoctorCommandTest extends TestCase
 {
     private string $providersBackup;

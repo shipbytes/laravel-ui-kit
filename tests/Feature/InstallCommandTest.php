@@ -5,6 +5,7 @@ namespace Shipbytes\UiKit\Tests\Feature;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\FortifyServiceProvider;
+use Orchestra\Testbench\Attributes\UsesVendor;
 use Shipbytes\UiKit\Tests\Fixtures\MakeAdminUser;
 use Shipbytes\UiKit\Tests\TestCase;
 
@@ -65,6 +66,9 @@ PHP);
         parent::tearDown();
     }
 
+    // UsesVendor: the closing doctor run checks the design system at
+    // base_path('vendor/…'), as it is in a real app.
+    #[UsesVendor]
     public function test_full_install_publishes_patches_and_records_state(): void
     {
         // The skeleton's database/migrations dir has no users migration —
