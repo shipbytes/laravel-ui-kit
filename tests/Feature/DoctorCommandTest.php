@@ -144,6 +144,29 @@ PHP);
         $this->assertMatchesRegularExpression('/no leftover ui-kit-theme\.css\s*\|\s*✗ fail\s*\|.*delete resources\/css\/ui-kit-theme\.css/u', $this->doctor());
     }
 
+    public function test_skeleton_font_after_the_import_fails(): void
+    {
+        $check = 'app\.css does not override the design system font';
+
+        @mkdir(resource_path('css'), 0755, true);
+        file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n");
+
+        $this->assertMatchesRegularExpression("/{$check}\s*\|\s*– skip\s*\|.*does not import ui-kit\.css/u", $this->doctor());
+
+        file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n@import './ui-kit.css';\n\n@theme {\n    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',\n        'Segoe UI Symbol', 'Noto Color Emoji';\n}\n");
+
+        $this->assertMatchesRegularExpression("/{$check}\s*\|\s*✗ fail\s*\|.*delete the @theme/u", $this->doctor());
+
+        file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n@import './ui-kit.css';\n\n@theme {\n    --font-sans: 'Geist', sans-serif;\n}\n");
+
+        $this->assertMatchesRegularExpression("/{$check}\s*\|\s*– skip\s*\|.*you override the font; make sure it is loaded/u", $this->doctor());
+
+        // Before the import it loses to the design system, so it is not an override.
+        file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n@theme {\n    --font-sans: 'Instrument Sans', sans-serif;\n}\n@import './ui-kit.css';\n");
+
+        $this->assertMatchesRegularExpression("/{$check}\s*\|\s*✓ pass/u", $this->doctor());
+    }
+
     public function test_nav_icons_must_be_heroicons(): void
     {
         config(['admin.nav' => [
