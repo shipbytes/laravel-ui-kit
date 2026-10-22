@@ -5,22 +5,21 @@
 
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
-use Livewire\Volt\Volt;
 use Shipbytes\UiKit\Http\Controllers\Auth\VerifyEmailController;
 
 Route::middleware('guest')->group(function () {
-    Volt::route('register', 'pages.auth.register')->name('register');
-    Volt::route('login', 'pages.auth.login')->name('login');
-    Volt::route('forgot-password', 'pages.auth.forgot-password')->name('password.request');
-    Volt::route('reset-password/{token}', 'pages.auth.reset-password')->name('password.reset');
+    Route::livewire('register', 'pages.auth.register')->name('register');
+    Route::livewire('login', 'pages.auth.login')->name('login');
+    Route::livewire('forgot-password', 'pages.auth.forgot-password')->name('password.request');
+    Route::livewire('reset-password/{token}', 'pages.auth.reset-password')->name('password.reset');
 
     if (Features::enabled(Features::twoFactorAuthentication())) {
-        Volt::route('two-factor-challenge', 'pages.auth.two-factor-challenge')->name('two-factor.challenge');
+        Route::livewire('two-factor-challenge', 'pages.auth.two-factor-challenge')->name('two-factor.challenge');
     }
 });
 
 Route::middleware('auth')->group(function () {
-    Volt::route('verify-email', 'pages.auth.verify-email')->name('verification.notice');
+    Route::livewire('verify-email', 'pages.auth.verify-email')->name('verification.notice');
 
     // Fortify registers its own verification.verify route when its
     // emailVerification feature is enabled — skip ours in that case so the
@@ -31,5 +30,5 @@ Route::middleware('auth')->group(function () {
             ->name('verification.verify');
     }
 
-    Volt::route('confirm-password', 'pages.auth.confirm-password')->name('password.confirm');
+    Route::livewire('confirm-password', 'pages.auth.confirm-password')->name('password.confirm');
 });

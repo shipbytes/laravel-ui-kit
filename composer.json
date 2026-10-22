@@ -1,9 +1,9 @@
 {
     "name": "shipbytes/laravel-ui-kit",
-    "description": "Admin panel + auth UI kit for Laravel 12+ with Livewire 3, Volt, and Tailwind 4. Modular installers for optional features.",
+    "description": "Admin panel + auth UI kit for Laravel 12+ with Livewire 4, Fortify and Tailwind 4. Modular installers for optional features.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["laravel", "livewire", "volt", "admin", "auth", "tailwind", "ui-kit"],
+    "keywords": ["laravel", "livewire", "admin", "auth", "tailwind", "ui-kit"],
     "homepage": "https://github.com/shipbytes/laravel-ui-kit",
     "support": {
         "issues": "https://github.com/shipbytes/laravel-ui-kit/issues",
@@ -23,8 +23,7 @@
         "illuminate/routing": "^12.0 || ^13.0",
         "laravel/fortify": "^1.25",
         "laravel/prompts": "^0.3.0",
-        "livewire/livewire": "^3.6",
-        "livewire/volt": "^1.7",
+        "livewire/livewire": "^4.4",
         "propaganistas/laravel-disposable-email": "^2.4"
     },
     "require-dev": {

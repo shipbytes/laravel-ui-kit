@@ -207,7 +207,7 @@ class InstallCommand extends Command
     /**
      * Publish Fortify's config and disable its default view routes.
      *
-     * The kit ships its own Volt-based login/register/etc. routes (in
+     * The kit ships its own Livewire page routes for login/register/etc. (in
      * routes/auth.php, auto-loaded by the service provider). If Fortify
      * also registers its default view routes, they collide on the same
      * paths and crash with "RegisterViewResponse is not instantiable"

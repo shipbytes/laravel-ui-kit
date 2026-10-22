@@ -6,7 +6,7 @@ use App\Models\User;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\FortifyServiceProvider;
-use Livewire\Volt\Volt;
+use Livewire\Livewire;
 use Shipbytes\UiKit\Tests\TestCase;
 use Shipbytes\UiKit\UiKitServiceProvider;
 
@@ -87,7 +87,7 @@ PHP);
         // published admin config and wire the routes/views up by hand.
         config(['admin' => require config_path('admin.php')]);
 
-        Volt::mount([resource_path('views/livewire')]);
+        Livewire::addLocation(viewPath: resource_path('views/livewire'));
 
         $provider = new UiKitServiceProvider($this->app);
         $ref = new \ReflectionMethod($provider, 'registerRoutes');
@@ -110,6 +110,15 @@ PHP);
             ->assertOk()
             ->assertSee('Welcome back')
             ->assertSee('Sign in');
+    }
+
+    public function test_auth_pages_are_livewire_page_routes(): void
+    {
+        $this->assertSame(
+            'pages.auth.login',
+            Route::getRoutes()->getByName('login')?->getAction('livewire_component'),
+            'routes/auth.php must register its pages through Route::livewire()'
+        );
     }
 
     public function test_register_page_renders(): void

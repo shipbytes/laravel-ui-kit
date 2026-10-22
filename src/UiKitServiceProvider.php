@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
-use Livewire\Volt\Volt;
+use Livewire\Component;
+use Livewire\Livewire;
 use Shipbytes\UiKit\Console\DoctorCommand;
 use Shipbytes\UiKit\Console\InstallCommand;
 use Shipbytes\UiKit\Console\InstallModuleCommand;
@@ -18,6 +19,7 @@ use Shipbytes\UiKit\Console\MakeAdminCommand;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
 use Shipbytes\UiKit\Support\ModuleRegistry;
 use Shipbytes\UiKit\Support\NullBadgeResolver;
+use Shipbytes\UiKit\Support\VoltCompat;
 use Shipbytes\UiKit\View\Components\UiKitBanners;
 use Shipbytes\UiKit\View\Components\UiKitHead;
 
@@ -29,6 +31,32 @@ class UiKitServiceProvider extends ServiceProvider
 
         $this->app->singleton(ModuleRegistry::class);
         $this->app->bind(SidebarBadgeResolver::class, NullBadgeResolver::class);
+
+        $this->registerVoltCompat();
+    }
+
+    /**
+     * Transition shim for apps upgrading from 0.2 — remove in 1.0.
+     *
+     * A 0.2 app's published routes/auth.php still calls Volt::route() and its
+     * published views still extend Livewire\Volt\Component. The provider
+     * loads that route file on every boot, so once Composer removes Volt
+     * every artisan command would fatal before the user could fix anything.
+     * Alias both names onto Livewire 4 equivalents until the app is migrated;
+     * ui-kit:doctor (checkLivewire) reports the leftovers with repair hints.
+     *
+     * Runs in register() so the aliases exist before boot() requires the
+     * route files.
+     */
+    protected function registerVoltCompat(): void
+    {
+        if (! class_exists('Livewire\Volt\Volt')) {
+            class_alias(VoltCompat::class, 'Livewire\Volt\Volt');
+        }
+
+        if (! class_exists('Livewire\Volt\Component')) {
+            class_alias(Component::class, 'Livewire\Volt\Component');
+        }
     }
 
     public function boot(): void
@@ -54,7 +82,7 @@ class UiKitServiceProvider extends ServiceProvider
 
         $this->registerRoutes();
         $this->registerRateLimiters();
-        $this->registerVoltMountPaths();
+        $this->registerLivewireLocations();
     }
 
     /**
@@ -167,12 +195,12 @@ class UiKitServiceProvider extends ServiceProvider
         return database_path('migrations/'.date('Y_m_d_His')."_{$name}.php");
     }
 
-    protected function registerVoltMountPaths(): void
+    protected function registerLivewireLocations(): void
     {
-        $livewireDir = resource_path('views/livewire');
+        $dir = resource_path('views/livewire');
 
-        if (is_dir($livewireDir) && class_exists(Volt::class)) {
-            Volt::mount([$livewireDir]);
+        if (is_dir($dir)) {
+            Livewire::addLocation(viewPath: $dir);
         }
     }
 }
