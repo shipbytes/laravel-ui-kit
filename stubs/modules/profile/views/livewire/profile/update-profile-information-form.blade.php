@@ -141,7 +141,7 @@ new class extends Component
                         <x-ds::button size="sm" wire:click="updateAvatar">Save photo</x-ds::button>
                         <x-ds::button variant="ghost" size="sm" wire:click="$set('avatar', null)">Cancel</x-ds::button>
                     @else
-                        <x-ds::button variant="ghost" size="sm" class="text-danger" wire:click="deleteAvatar" wire:confirm="Remove your profile photo?">Remove</x-ds::button>
+                        <x-ds::button variant="ghost" size="sm" tone="danger" wire:click="deleteAvatar" wire:confirm="Remove your profile photo?">Remove</x-ds::button>
                     @endif
                 </div>
             @endif

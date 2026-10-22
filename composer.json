@@ -25,7 +25,7 @@
         "laravel/prompts": "^0.3.0",
         "livewire/livewire": "^4.4",
         "propaganistas/laravel-disposable-email": "^2.4",
-        "shipbytes/blade-ui": "^1.1"
+        "shipbytes/blade-ui": "^1.2"
     },
     "require-dev": {
         "larastan/larastan": "^3.10",
