@@ -1,6 +1,6 @@
 # Laravel UI Kit
 
-Admin panel + auth UI scaffolding for **Laravel 12+** with Livewire 3, Volt, Fortify, and **Tailwind CSS v4**.
+Admin panel + auth UI scaffolding for **Laravel 12+** with Livewire 4, Fortify, and **Tailwind CSS v4**.
 
 **Documentation with screenshots: [shipbytes.dev/docs/laravel-ui-kit](https://shipbytes.dev/docs/laravel-ui-kit).**
 
@@ -10,7 +10,7 @@ Core + 7 optional modules, installed by a turnkey `php artisan ui-kit:install`. 
 
 ### Always installed (core)
 
-- **Auth pages** — login, register, forgot/reset password, email verification, confirm password, and a **two-factor challenge** page (Livewire Volt + Fortify), all with dark-mode variants
+- **Auth pages** — login, register, forgot/reset password, email verification, confirm password, and a **two-factor challenge** page (Livewire 4 single-file components + Fortify), all with dark-mode variants
 - **Working 2FA** — the login flow stages a TOTP/recovery-code challenge for users who enabled two-factor auth (enable/confirm UI ships with the `profile` module)
 - **Admin shell** — collapsible sidebar, mobile bottom nav, theme toggle, current-user footer with profile link + logout; nav is config-driven from `config/admin.php`
 - **User shell** — a light authenticated layout (`layouts/user-shell`) used by user-facing pages like `/profile`
@@ -37,7 +37,7 @@ Modules that ship models also ship **factories**, so `SupportTicket::factory()` 
 
 - PHP 8.2+
 - Laravel 12 (Laravel 13 supported in composer constraints; CI leg is experimental)
-- Livewire 3.6+ / Volt 1.7+
+- Livewire 4.4+ (installed with the kit; Volt is no longer used)
 - Tailwind CSS v4 (the default in fresh Laravel 12 apps)
 - Node 18+ (for the Vite build)
 
@@ -56,7 +56,7 @@ When the Laravel installer prompts you:
 | Prompt | Pick | Why |
 | --- | --- | --- |
 | Starter kit | **None** | The kit *is* the auth/admin scaffolding — every starter kit (Breeze-style Livewire, React, Vue) collides with it. |
-| Frontend stack | **Blade** | Gives you plain Vite + Tailwind CSS v4, which the kit's `@theme` file plugs straight into. Livewire 3 + Volt arrive via Composer with the kit itself. |
+| Frontend stack | **Blade** | Gives you plain Vite + Tailwind CSS v4, which the kit's `@theme` file plugs straight into. Livewire 4 arrives via Composer with the kit itself. |
 | Testing framework | Pest or PHPUnit | No interaction with the kit — pick your preference. |
 | Database | Any (the SQLite default is fine) | The kit's migrations run on anything Laravel supports. |
 | Run `npm install` / migrations | Yes | The kit's Vite wiring expects `resources/css/app.css` and `resources/js/app.js` to exist, and its installer migrates on top of the base tables. |
@@ -163,7 +163,7 @@ composer update shipbytes/laravel-ui-kit
    `admin-middleware` module is installed and sets the `is_admin` flag when the
    column exists — whichever mechanisms are present.
 
-3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table (published files, Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
+3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table (published files, Livewire 4 migration, Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
 
 > The `UiKitUser` trait used to be a manual step here — the installer now
 > applies it to `app/Models/User.php` itself and only asks you to do it by
@@ -313,6 +313,7 @@ Run `php artisan ui-kit:doctor` first — it catches the common ones and prints 
 - **Password reset / verification emails never arrive** — check `MAIL_*` in `.env`.
 - **"Unauthorized" on `/admin`** — the fallback middleware requires `$user->is_admin` to be truthy; with `admin-middleware` installed you need the `admin` role assigned.
 - **Sidebar badges show 0 / blank** — bind your own `SidebarBadgeResolver`; the default returns an empty array.
+- **`Class "Livewire\Volt\Volt" not found` or a leftover `VoltServiceProvider` after upgrading from 0.2** — finish the Livewire 4 migration: the doctor's Livewire rows print each step, and the Livewire 4 entry in `CHANGELOG.md` lists them.
 - **`route:cache` fails with a duplicate name** — the doctor lists the duplicates; usually a route file was copied without its `ui-kit:managed` header and loaded twice by hand.
 - **The welcome page's "Dashboard" button 404s** — that button is stock Laravel and links to `/dashboard`, which nothing registers. The kit's panel is at `/admin`; edit `resources/views/welcome.blade.php` to point there (or replace the page).
 

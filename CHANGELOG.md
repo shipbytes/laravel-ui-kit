@@ -10,6 +10,44 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: Livewire 4.** The kit now requires `livewire/livewire: ^4.4` and
+  no longer uses Volt. The eleven auth and profile pages stay single-file
+  components at the same paths under `resources/views/livewire/…` (no ⚡
+  prefix), now extending `Livewire\Component`; `routes/auth.php` registers them
+  with `Route::livewire()` instead of `Volt::route()`, with unchanged URLs and
+  route names. Nothing changes visually. To upgrade a 0.2 app:
+  1. If the app's own `composer.json` requires `livewire/volt` (it normally
+     arrives through the kit), run `composer remove livewire/volt --no-update`.
+  2. `composer require shipbytes/laravel-ui-kit:^0.3 -W` — a `^0.2`
+     constraint never picks up 0.3, and `-W` lets Composer move Livewire 3 to 4
+     and drop Volt.
+  3. In `routes/auth.php`, replace `Volt::route(` with `Route::livewire(` and
+     delete the `use Livewire\Volt\Volt;` line.
+  4. In `resources/views/livewire/**`, replace `use Livewire\Volt\Component;`
+     with `use Livewire\Component;`.
+  5. If the app has a `VoltServiceProvider`, remove it from
+     `bootstrap/providers.php` and delete `app/Providers/VoltServiceProvider.php`.
+  6. `php artisan ui-kit:doctor` — every row should pass.
+
+  Until steps 3–5 are done the app keeps working through the shim below.
+
+### Added
+
+- `ui-kit:doctor` checks for the Livewire 4 move: `Livewire 4 installed`,
+  `routes/auth.php uses Route::livewire` and `no Volt service provider`, each
+  with the repair step as its hint.
+- A transition shim for apps upgrading from 0.2: when Volt is not installed,
+  the kit aliases `Livewire\Volt\Volt` (`route()`, `mount()`) and
+  `Livewire\Volt\Component` onto their Livewire 4 equivalents, so an
+  unmigrated `routes/auth.php` and its views keep working (and artisan keeps
+  booting) until the steps above are done. It will be removed in 1.0.
+
+### Removed
+
+- The `livewire/volt` dependency.
+
 ## [0.2.2] - 2026-10-22
 
 ### Added
