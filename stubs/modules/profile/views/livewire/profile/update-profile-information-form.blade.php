@@ -16,6 +16,11 @@ new class extends Component
     public string $email = '';
     public $avatar = null;
 
+    // Bumped after a save or cancel. The drop zone keys on it, so Livewire
+    // replaces it and its file list (Alpine state) starts empty again rather
+    // than still listing the photo that was just saved.
+    public int $avatarUpload = 0;
+
     public function mount(): void
     {
         $this->name = Auth::user()->name ?? '';
@@ -75,8 +80,15 @@ new class extends Component
         $user->forceFill(['avatar_path' => $path])->save();
 
         $this->reset('avatar');
+        $this->avatarUpload++;
         $this->dispatch('avatar-updated');
         $this->dispatch('profile-updated', name: $user->name);
+    }
+
+    public function cancelAvatar(): void
+    {
+        $this->reset('avatar');
+        $this->avatarUpload++;
     }
 
     public function deleteAvatar(): void
@@ -133,15 +145,17 @@ new class extends Component
 
         <div class="min-w-0 flex-1">
             {{-- preview off: the avatar beside it already shows the pending photo. --}}
-            <x-ds::file-upload name="avatar" label="Profile photo" accept="image/jpeg,image/png,image/webp"
-                :maxSize="2 * 1024 * 1024" :preview="false" wire:model="avatar"
-                :error="$errors->first('avatar')" />
+            <div wire:key="avatar-upload-{{ $avatarUpload }}">
+                <x-ds::file-upload name="avatar" label="Profile photo" accept="image/jpeg,image/png,image/webp"
+                    :maxSize="2 * 1024 * 1024" :preview="false" wire:model="avatar"
+                    :error="$errors->first('avatar')" />
+            </div>
 
             @if ($avatar || auth()->user()->avatar_path)
                 <div class="mt-3 flex items-center gap-2">
                     @if ($avatar)
                         <x-ds::button size="sm" wire:click="updateAvatar">Save photo</x-ds::button>
-                        <x-ds::button variant="ghost" size="sm" wire:click="$set('avatar', null)">Cancel</x-ds::button>
+                        <x-ds::button variant="ghost" size="sm" wire:click="cancelAvatar">Cancel</x-ds::button>
                     @else
                         <x-ds::button variant="ghost" size="sm" tone="danger" wire:click="deleteAvatar" wire:confirm="Remove your profile photo?">Remove</x-ds::button>
                     @endif
