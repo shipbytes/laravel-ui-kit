@@ -10,22 +10,39 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
-The start of 0.4.0: the kit moves onto the Shipbytes design system. This
-first step covers the layouts and the shared components; the auth, profile and
-admin screens inside them still use the 0.3 styling and are restyled before
-0.4.0 ships.
+The start of 0.4.0: the kit moves onto the Shipbytes design system. The
+layouts, the shared components, the auth pages and the profile page are done;
+the admin screens inside the shell still use the 0.3 styling and are restyled
+before 0.4.0 ships.
 
 ### Changed
 
 - **Breaking: built on the Shipbytes design system (`shipbytes/blade-ui`).**
   The kit no longer carries a palette, fonts or components of its own. The
   admin shell, the user shell, the guest layout, the theme toggle, the session
-  status message and the impersonation ribbon and button now use `ds::`
-  components and the design system's semantic tokens (`bg-surface`,
-  `text-fg-muted`, `border-border`, …), which switch for dark mode on their
-  own. The phone's "More" menu is the design system's bottom sheet. The
-  accent colour is the design system's blue, and its Inter is the one font
-  the layouts load.
+  status message, the impersonation ribbon and button, the seven auth pages
+  and the profile page now use `ds::` components and the design system's
+  semantic tokens (`bg-surface`, `text-fg-muted`, `border-border`, …), which
+  switch for dark mode on their own. The phone's "More" menu is the design
+  system's bottom sheet. The accent colour is the design system's blue, and
+  its Inter is the one font the layouts load. Every `wire:model`, action,
+  validation message and `config('ui-kit.copy.*')` string is unchanged. On
+  the profile page:
+  - **The avatar field is a drop zone.** The photo shows as a round
+    `ds::avatar` (initials when there is none) beside a `ds::file-upload`
+    labelled "Profile photo"; Save photo, Cancel and Remove sit under it. The
+    hover overlay on the old square thumbnail is gone.
+  - **Account deletion confirms in `ds::modal`.** The dialog is opened by
+    Alpine state on the form (`confirmingDeletion`) instead of the
+    `open-modal` window event, stays open with the error shown after a wrong
+    password, and closes with Cancel, the backdrop or Escape.
+  - The two-factor confirm form now shows Fortify's "invalid code" message
+    under the code field rather than below the buttons.
+
+  To take the new auth and profile views into an existing app,
+  `php artisan vendor:publish --tag=ui-kit-views --force` and
+  `php artisan ui-kit:install-module profile --force` (back up any of these
+  you edited first).
   Composer installs `shipbytes/blade-ui` with the kit. The
   published `resources/css/ui-kit.css` imports its `tokens.css` and `theme.css`
   and adds the `@source` line Tailwind needs to see its components, so
@@ -47,6 +64,16 @@ admin screens inside them still use the 0.3 styling and are restyled before
      `chart` → `chart-bar`, `history` → `clock`; `users`, `ticket`, `clock`
      and `user-circle` stay as they are.
   6. `php artisan ui-kit:doctor`. Every row should pass.
+- **Requires `shipbytes/blade-ui` ^1.2.** In 1.1 every `ds::button` inside a
+  Livewire component rendered with a stray `>` before its label ("> Sign in",
+  with the `>` in its accessible name): a comment in the button named a tag,
+  and Livewire placed one of its `<!--[if BLOCK]>` markers inside the real
+  button tag because of it. 1.2.0 fixes that and adds what these screens use:
+  `tone="danger"` on ghost and secondary buttons (the avatar's Remove is now
+  a quiet red ghost button rather than a ghost button with `text-danger`
+  forced on it), and a readonly look for `ds::input` (the reset-password
+  email now looks fixed instead of editable). The page tests now fail if a
+  Livewire marker ever lands inside a tag again.
 - **Nav icons are Heroicons v2 names**, rendered through `ds::icon`, so any of
   the outline icons on heroicons.com works in `config/admin.php`.
   The kit's own entries are now `squares-2x2` (Dashboard), `users`, `ticket`,
@@ -64,10 +91,38 @@ admin screens inside them still use the 0.3 styling and are restyled before
   `ui-kit.css imports the design system`, `no leftover ui-kit-theme.css` and
   `nav icons are Heroicons` (it lists each `label => icon` that doesn't
   resolve). Each failing row says how to fix it.
+- **The installer removes the Laravel 12 skeleton's Instrument Sans.** The
+  skeleton's `app.css` ends with an `@theme` block setting `--font-sans` to
+  `'Instrument Sans'`. It comes after the kit's import, so it beat the design
+  system's Inter, and since nothing loads Instrument Sans the app rendered in
+  the system font. `ui-kit:install` now deletes that one declaration (and the
+  `@theme` block, if nothing else is in it); any other font is left alone. A
+  new doctor row, `app.css does not override the design system font`, fails
+  while the Instrument Sans declaration follows the import and is skipped,
+  with a reminder to load it, when the app sets a font of its own there.
 - `StubStyleTest`: the suite now fails when a published view uses a raw
   palette class, a `dark:` variant, an inline `<svg>` or a raw form control
   instead of the design system. Screens that haven't been moved over yet are
   on an explicit allowlist that the rest of the 0.4.0 work empties.
+
+### Fixed
+
+- **A profile photo never saved on a standard app.** The profile module wrote
+  the file to the public disk and then set `avatar_path` with `update()`,
+  which a stock `User` model (whose `$fillable` is name, email and password)
+  silently ignores, so the page went straight back to the initials. The same
+  went for Remove. Both now use `forceFill()`. This dates from 0.1. Existing
+  apps need the new profile view:
+  `php artisan ui-kit:install-module profile --force`.
+- **Dark mode switched off after any `wire:navigate` page change**, including
+  the redirect from the login form to the two-factor challenge: Livewire
+  copies the next page's `<html>` attributes over the current one and does
+  not re-run the head snippet. The theme store now re-applies the theme on
+  every swap, before paint. Existing apps need the new `resources/js/ui-kit.js`
+  (`php artisan vendor:publish --tag=ui-kit-assets --force`) and an asset
+  build.
+- After Save photo or Cancel, the drop zone still listed the file just saved
+  or discarded. It now resets.
 
 ### Removed
 
@@ -77,6 +132,9 @@ admin screens inside them still use the 0.3 styling and are restyled before
 - The kit's own `@custom-variant dark`, `[x-cloak]` and `.safe-area-bottom`
   rules. The design system's `theme.css` provides all three.
 - The `layouts/partials/nav-icons` partial and its hand-drawn icons.
+- The profile module's `<x-modal>` component
+  (`resources/views/components/modal.blade.php`). Nothing in the kit uses it
+  now; an app that used it in its own views keeps its published copy.
 
 ## [0.3.0] - 2026-10-22
 
