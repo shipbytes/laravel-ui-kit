@@ -4,7 +4,9 @@ namespace Shipbytes\UiKit\Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Laravel\Fortify\FortifyServiceProvider;
 use Livewire\Livewire;
@@ -69,7 +71,9 @@ class User extends Authenticatable
 {
     protected $table = 'users';
 
-    protected $guarded = [];
+    // The skeleton's own list. NOT $guarded = []: that hid a profile stub
+    // that mass-assigned avatar_path, which a real app silently drops.
+    protected $fillable = ['name', 'email', 'password'];
 
     protected $hidden = ['password', 'remember_token'];
 }
@@ -223,6 +227,34 @@ PHP);
             ->assertDontSee('<x-modal', false);
 
         $this->assertRendersCleanly($response);
+    }
+
+    public function test_avatar_is_saved_and_removed_on_a_stock_user_model(): void
+    {
+        Storage::fake('public');
+
+        $user = User::forceCreate([
+            'name' => 'Plain User',
+            'email' => 'plain@example.com',
+            'password' => bcrypt('secret'),
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($user);
+
+        $form = Livewire::test('profile.update-profile-information-form')
+            ->set('avatar', UploadedFile::fake()->image('me.png', 64, 64))
+            ->call('updateAvatar')
+            ->assertHasNoErrors();
+
+        $path = $user->fresh()->avatar_path;
+        $this->assertNotNull($path, 'the photo was stored but avatar_path was never saved');
+        Storage::disk('public')->assertExists($path);
+
+        $form->call('deleteAvatar');
+
+        $this->assertNull($user->fresh()->avatar_path);
+        Storage::disk('public')->assertMissing($path);
     }
 
     public function test_two_factor_challenge_redirects_without_staged_login(): void

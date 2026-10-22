@@ -70,7 +70,9 @@ new class extends Component
             Storage::disk('public')->putFileAs('avatars', $this->avatar, $user->getKey().'.'.$extension);
         }
 
-        $user->update(['avatar_path' => $path]);
+        // forceFill, not update(): avatar_path is not in a stock User's
+        // $fillable, so update() dropped it silently and no photo ever stuck.
+        $user->forceFill(['avatar_path' => $path])->save();
 
         $this->reset('avatar');
         $this->dispatch('avatar-updated');
@@ -83,7 +85,7 @@ new class extends Component
 
         if ($user->avatar_path) {
             Storage::disk('public')->delete($user->avatar_path);
-            $user->update(['avatar_path' => null]);
+            $user->forceFill(['avatar_path' => null])->save();
         }
 
         $this->dispatch('avatar-updated');
