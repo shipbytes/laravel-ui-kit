@@ -24,6 +24,7 @@ class DoctorCommand extends Command
         $this->checkLivewire();
         $this->checkFortify();
         $this->checkViteWiring();
+        $this->checkDesignSystem();
         $this->checkUserTrait();
         $this->checkModuleRequirements();
         $this->checkDuplicateRouteNames();
@@ -206,6 +207,69 @@ class DoctorCommand extends Command
             $this->passCheck('ui-kit.js imported from app.js');
         } else {
             $this->failCheck('ui-kit.js imported from app.js', "add import './ui-kit'; to resources/js/app.js");
+        }
+    }
+
+    /**
+     * 0.4 moved the kit onto the Shipbytes design system. An app upgraded from
+     * 0.3 keeps its old ui-kit.css, which imports the kit's own theme file and
+     * never reaches the design system's tokens, and its custom nav entries
+     * keep icon names from the old partial. Neither throws: the first renders
+     * unstyled components, the second renders a nav row without an icon.
+     */
+    protected function checkDesignSystem(): void
+    {
+        if (file_exists(base_path('vendor/shipbytes/blade-ui/dist/theme.css'))) {
+            $this->passCheck('design system installed');
+        } else {
+            $this->failCheck('design system installed', 'composer require shipbytes/blade-ui');
+        }
+
+        $css = resource_path('css/ui-kit.css');
+
+        if (! file_exists($css)) {
+            $this->skipCheck('ui-kit.css imports the design system', 'resources/css/ui-kit.css not published');
+        } else {
+            $contents = (string) file_get_contents($css);
+
+            if (str_contains($contents, 'blade-ui/dist/theme.css') && str_contains($contents, '@source')) {
+                $this->passCheck('ui-kit.css imports the design system');
+            } else {
+                $this->failCheck('ui-kit.css imports the design system', 'php artisan vendor:publish --tag=ui-kit-assets --force (the 0.3 file imported ./ui-kit-theme.css instead)');
+            }
+        }
+
+        if (file_exists(resource_path('css/ui-kit-theme.css'))) {
+            $this->failCheck('no leftover ui-kit-theme.css', 'delete resources/css/ui-kit-theme.css: tokens now come from the design system, and any overrides belong in app.css after the ui-kit.css import (:root { --ds-accent: … })');
+        } else {
+            $this->passCheck('no leftover ui-kit-theme.css');
+        }
+
+        $this->checkNavIcons();
+    }
+
+    protected function checkNavIcons(): void
+    {
+        $svgDir = base_path('vendor/blade-ui-kit/blade-heroicons/resources/svg');
+        $aliases = (array) config('blade-ui.icon_aliases', []);
+        $bad = [];
+
+        foreach ((array) config('admin.nav', []) as $item) {
+            if (! is_array($item) || ! isset($item['icon']) || ! is_string($item['icon'])) {
+                continue;
+            }
+
+            $icon = $item['icon'];
+
+            if (! file_exists("{$svgDir}/o-{$icon}.svg") && ! array_key_exists($icon, $aliases)) {
+                $bad[] = ($item['label'] ?? '?').' => '.$icon;
+            }
+        }
+
+        if ($bad === []) {
+            $this->passCheck('nav icons are Heroicons');
+        } else {
+            $this->failCheck('nav icons are Heroicons', 'not found: '.implode(', ', $bad).'. 0.4 switched nav icons to Heroicons v2 names (heroicons.com); e.g. grid → squares-2x2, note → document-text, mail → envelope, history → clock');
         }
     }
 

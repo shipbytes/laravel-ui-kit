@@ -109,7 +109,10 @@ PHP);
         $this->get('/login')
             ->assertOk()
             ->assertSee('Welcome back')
-            ->assertSee('Sign in');
+            ->assertSee('Sign in')
+            // Blade prints a component tag it failed to compile as literal
+            // text, so this is the signature of a broken ds:: call.
+            ->assertDontSee('<x-ds::', false);
     }
 
     public function test_auth_pages_are_livewire_page_routes(): void
@@ -169,7 +172,12 @@ PHP);
             ->get('/admin')
             ->assertOk()
             ->assertSee('Dashboard')
-            ->assertSee('Total users');
+            ->assertSee('Total users')
+            // The shell: rail, phone bar and "More" sheet, all through ds::.
+            ->assertSee('aria-current="page"', false)
+            ->assertSee('aria-label="Primary"', false)
+            ->assertSee('aria-label="More"', false)
+            ->assertDontSee('<x-ds::', false);
     }
 
     public function test_admin_users_list_renders_for_admins(): void

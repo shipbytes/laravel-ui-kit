@@ -13,7 +13,7 @@
 @if ($brandLogoExists)
     <img src="{{ $brandIsRemote ? $brandLogo : asset($brandLogo) }}" alt="{{ config('ui-kit.brand.name') }}" class="{{ $markClass ?? 'h-6 w-auto' }}">
 @else
-    <span class="flex {{ $badgeClass ?? 'size-6' }} shrink-0 items-center justify-center rounded-lg bg-brand-600 text-xs font-bold text-white">
+    <span class="flex {{ $badgeClass ?? 'size-6' }} shrink-0 items-center justify-center rounded-control bg-accent text-meta font-bold text-on-accent">
         {{ strtoupper(mb_substr(config('ui-kit.brand.name') ?: 'A', 0, 1)) }}
     </span>
 @endif

@@ -32,11 +32,14 @@ return [
     |   - ['label' => ..., 'route' => ..., 'icon' => ..., 'badge' => 'open_tickets']
     |
     | Modules append their own entries via the install command.
-    | `icon` is a key into stubs/core/views/layouts/partials/nav-icons.blade.php.
+    | `icon` is a Heroicons v2 outline name (https://heroicons.com), rendered
+    | through the design system's ds::icon, e.g. 'squares-2x2', 'users',
+    | 'document-text'. `php artisan ui-kit:doctor` flags a name that does not
+    | resolve.
     */
 
     'nav' => [
-        ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'grid'],
+        ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'squares-2x2'],
         ['label' => 'Users', 'route' => 'admin.users.index', 'icon' => 'users'],
         /* ui-kit:nav-start */
         /* ui-kit:nav-end */

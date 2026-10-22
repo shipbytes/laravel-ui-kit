@@ -30,8 +30,8 @@ new #[Layout('layouts.guest')] class extends Component
 
 <div>
     <div class="text-center mb-8">
-        <h1 class="text-2xl font-boldtext tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.copy.login.heading') }}</h1>
-        <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-booktext">{{ config('ui-kit.copy.login.subheading') }}</p>
+        <h1 class="text-2xl font-sans font-semibold tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.copy.login.heading') }}</h1>
+        <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">{{ config('ui-kit.copy.login.subheading') }}</p>
     </div>
 
     <x-auth-session-status class="mb-4" :status="session('status')" />
@@ -57,7 +57,7 @@ new #[Layout('layouts.guest')] class extends Component
             <label for="remember" class="flex items-center gap-2 cursor-pointer">
                 <input wire:model="form.remember" id="remember" type="checkbox" name="remember"
                        class="h-4 w-4 rounded border-gray-300 dark:border-white/20 dark:bg-zinc-800 text-indigo-600 focus:ring-indigo-600">
-                <span class="text-sm text-gray-600 dark:text-zinc-300 font-booktext">Remember me</span>
+                <span class="text-sm text-gray-600 dark:text-zinc-300 font-sans font-normal">Remember me</span>
             </label>
 
             @if (Route::has('password.request'))
@@ -72,7 +72,7 @@ new #[Layout('layouts.guest')] class extends Component
         </button>
     </form>
 
-    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-booktext">
+    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">
         Don't have an account?
         <a href="{{ route('register') }}" wire:navigate class="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">Create one free</a>
     </p>

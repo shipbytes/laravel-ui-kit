@@ -1,34 +1,30 @@
 /**
- * UI Kit base styles (Tailwind CSS v4).
- *
- * The installer imports this once from resources/css/app.css, after the
- * `@import 'tailwindcss';` line:
+ * UI Kit base styles (Tailwind CSS v4), built on the Shipbytes design system
+ * (shipbytes/blade-ui). Published to resources/css/ui-kit.css; the installer
+ * imports it once from resources/css/app.css, after `@import 'tailwindcss';`:
  *
  *   @import './ui-kit.css';
+ *
+ * The vendor paths below are relative to THIS file, not to app.css: Tailwind
+ * resolves an @import or @source against the stylesheet it is written in. From
+ * resources/css/ that is ../../vendor/…, the same path the design system's own
+ * docs give for app.css, because both files sit in the same directory.
+ *
+ * The @source line is not optional. Tailwind does not scan vendor/, so without
+ * it every class the ds:: components emit is discarded and they render as
+ * unstyled HTML, with no error anywhere.
+ *
+ * To override a token (the accent colour, say), redefine its --ds-* variable
+ * in app.css AFTER the ui-kit.css import, e.g. `:root { --ds-accent: … }`.
  */
 
-@import './ui-kit-theme.css';
+@import '../../vendor/shipbytes/blade-ui/dist/tokens.css';
+@import '../../vendor/shipbytes/blade-ui/dist/theme.css';
+@source '../../vendor/shipbytes/blade-ui/resources/views';
 
-[x-cloak] {
-    display: none !important;
-}
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
 
-.safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 0);
-}
-
-.scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-    display: none;
-}
-
-/* Native form controls pick up the brand color without needing the
-   @tailwindcss/forms plugin. */
-input[type='checkbox'],
-input[type='radio'] {
-    accent-color: var(--color-brand-600, #4f46e5);
-}
+/* Native form controls that have not yet moved to ds::checkbox / ds::radio.
+   Removed in Phase 4 together with the last raw <input>. */
+input[type='checkbox'], input[type='radio'] { accent-color: var(--ds-accent); }

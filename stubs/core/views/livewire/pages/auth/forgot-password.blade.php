@@ -34,8 +34,8 @@ new #[Layout('layouts.guest')] class extends Component
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
             </svg>
         </div>
-        <h1 class="text-2xl font-boldtext tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.copy.forgot_password.heading') }}</h1>
-        <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-booktext leading-relaxed">{{ config('ui-kit.copy.forgot_password.subheading') }}</p>
+        <h1 class="text-2xl font-sans font-semibold tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.copy.forgot_password.heading') }}</h1>
+        <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal leading-relaxed">{{ config('ui-kit.copy.forgot_password.subheading') }}</p>
     </div>
 
     <x-auth-session-status class="mb-4" :status="session('status')" />
@@ -54,7 +54,7 @@ new #[Layout('layouts.guest')] class extends Component
         </button>
     </form>
 
-    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-booktext">
+    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">
         Remember your password?
         <a href="{{ route('login') }}" wire:navigate class="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">Back to sign in</a>
     </p>

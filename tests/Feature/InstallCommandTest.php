@@ -5,6 +5,7 @@ namespace Shipbytes\UiKit\Tests\Feature;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\FortifyServiceProvider;
+use Orchestra\Testbench\Attributes\UsesVendor;
 use Shipbytes\UiKit\Tests\Fixtures\MakeAdminUser;
 use Shipbytes\UiKit\Tests\TestCase;
 
@@ -65,6 +66,9 @@ PHP);
         parent::tearDown();
     }
 
+    // UsesVendor: the closing doctor run checks the design system at
+    // base_path('vendor/…'), as it is in a real app.
+    #[UsesVendor]
     public function test_full_install_publishes_patches_and_records_state(): void
     {
         // The skeleton's database/migrations dir has no users migration —
@@ -116,7 +120,12 @@ PHP);
             $appCss
         );
         $this->assertStringContainsString("import './ui-kit';", file_get_contents(resource_path('js/app.js')));
-        $this->assertFileExists(resource_path('css/ui-kit-theme.css'));
+        // ui-kit.css carries the design system's three lines itself; the kit
+        // no longer publishes a theme file of its own.
+        $uiKitCss = file_get_contents(resource_path('css/ui-kit.css'));
+        $this->assertStringContainsString("@import '../../vendor/shipbytes/blade-ui/dist/theme.css';", $uiKitCss);
+        $this->assertStringContainsString("@source '../../vendor/shipbytes/blade-ui/resources/views';", $uiKitCss);
+        $this->assertFileDoesNotExist(resource_path('css/ui-kit-theme.css'));
 
         // The single deferred migrate covered core + module + Fortify 2FA migrations.
         $this->assertTrue(Schema::hasColumn('users', 'is_admin'));

@@ -152,8 +152,9 @@ class InstallCommand extends Command
      * Wire the kit's CSS/JS into the app's Vite entrypoints so no manual
      * import edits are needed. Idempotent — skips when already wired.
      *
-     * The CSS import goes right after `@import 'tailwindcss';` because the
-     * kit's @theme / @custom-variant blocks must follow Tailwind's base
+     * The CSS import goes right after `@import 'tailwindcss';` because
+     * ui-kit.css pulls in the design system's tokens and theme (its @theme
+     * block and @custom-variant dark), which must follow Tailwind's base
      * import in the final bundle.
      */
     protected function patchViteEntrypoints(): void

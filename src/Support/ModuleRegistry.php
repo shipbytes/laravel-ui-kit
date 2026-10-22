@@ -65,7 +65,7 @@ class ModuleRegistry
                 "Route::get('changelog/{ulid}/edit', \\App\\Livewire\\Admin\\Changelog\\ChangelogForm::class)->name('changelog.edit');",
             ],
             'admin_nav' => [
-                ['label' => 'Changelog', 'route' => 'admin.changelog.index', 'icon' => 'note'],
+                ['label' => 'Changelog', 'route' => 'admin.changelog.index', 'icon' => 'document-text'],
             ],
             'artisan_publish' => [
                 ['--provider' => 'Mews\\Purifier\\PurifierServiceProvider'],
@@ -81,7 +81,7 @@ class ModuleRegistry
                 "Route::get('contacts', \\App\\Livewire\\Admin\\Contacts\\ContactList::class)->name('contacts.index');",
             ],
             'admin_nav' => [
-                ['label' => 'Contacts', 'route' => 'admin.contacts.index', 'icon' => 'mail', 'badge' => 'unread_contacts'],
+                ['label' => 'Contacts', 'route' => 'admin.contacts.index', 'icon' => 'envelope', 'badge' => 'unread_contacts'],
             ],
             'post_install_notes' => [
                 'Wire up a public contact form that writes to `\\App\\Models\\ContactSubmission` (the module only ships the admin inbox).',
