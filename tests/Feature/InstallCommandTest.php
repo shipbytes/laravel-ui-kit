@@ -116,7 +116,12 @@ PHP);
             $appCss
         );
         $this->assertStringContainsString("import './ui-kit';", file_get_contents(resource_path('js/app.js')));
-        $this->assertFileExists(resource_path('css/ui-kit-theme.css'));
+        // ui-kit.css carries the design system's three lines itself; the kit
+        // no longer publishes a theme file of its own.
+        $uiKitCss = file_get_contents(resource_path('css/ui-kit.css'));
+        $this->assertStringContainsString("@import '../../vendor/shipbytes/blade-ui/dist/theme.css';", $uiKitCss);
+        $this->assertStringContainsString("@source '../../vendor/shipbytes/blade-ui/resources/views';", $uiKitCss);
+        $this->assertFileDoesNotExist(resource_path('css/ui-kit-theme.css'));
 
         // The single deferred migrate covered core + module + Fortify 2FA migrations.
         $this->assertTrue(Schema::hasColumn('users', 'is_admin'));

@@ -2,9 +2,12 @@
 
 namespace Shipbytes\UiKit\Tests;
 
+use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
+use BladeUI\Icons\BladeIconsServiceProvider;
 use Illuminate\Filesystem\Filesystem;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Shipbytes\BladeUi\BladeUiServiceProvider;
 use Shipbytes\UiKit\UiKitServiceProvider;
 
 abstract class TestCase extends Orchestra
@@ -13,6 +16,9 @@ abstract class TestCase extends Orchestra
     {
         return [
             LivewireServiceProvider::class,
+            BladeIconsServiceProvider::class,
+            BladeHeroiconsServiceProvider::class,
+            BladeUiServiceProvider::class,
             UiKitServiceProvider::class,
         ];
     }
