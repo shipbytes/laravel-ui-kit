@@ -62,6 +62,32 @@ PHP);
         $this->assertMatchesRegularExpression('/routes\/auth\.php uses Route::livewire\s*\|\s*✓ pass/u', $this->doctor());
     }
 
+    public function test_volt_view_fails_until_migrated(): void
+    {
+        $this->assertMatchesRegularExpression('/views free of Volt imports\s*\|\s*– skip/u', $this->doctor());
+
+        $view = resource_path('views/livewire/pages/auth/login.blade.php');
+        @mkdir(dirname($view), 0755, true);
+        file_put_contents($view, <<<'BLADE'
+<?php
+
+use Livewire\Volt\Component;
+
+new class extends Component {};
+?>
+
+<div></div>
+BLADE);
+
+        $output = $this->doctor();
+
+        $this->assertMatchesRegularExpression('/views free of Volt imports\s*\|\s*✗ fail\s*\|.*resources\/views\/livewire\/pages\/auth\/login\.blade\.php/u', $output);
+
+        file_put_contents($view, str_replace('Livewire\Volt\Component', 'Livewire\Component', (string) file_get_contents($view)));
+
+        $this->assertMatchesRegularExpression('/views free of Volt imports\s*\|\s*✓ pass/u', $this->doctor());
+    }
+
     public function test_leftover_volt_provider_fails(): void
     {
         $this->assertMatchesRegularExpression('/no Volt service provider\s*\|\s*✓ pass/u', $this->doctor());

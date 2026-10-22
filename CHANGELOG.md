@@ -36,8 +36,9 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 ### Added
 
 - `ui-kit:doctor` checks for the Livewire 4 move: `Livewire 4 installed`,
-  `routes/auth.php uses Route::livewire` and `no Volt service provider`, each
-  with the repair step as its hint.
+  `routes/auth.php uses Route::livewire`, `views free of Volt imports` (lists
+  the views under `resources/views/livewire/` that still import Volt) and
+  `no Volt service provider`, each with the repair step as its hint.
 - A transition shim for apps upgrading from 0.2: when Volt is not installed,
   the kit aliases `Livewire\Volt\Volt` (`route()`, `mount()`) and
   `Livewire\Volt\Component` onto their Livewire 4 equivalents, so an

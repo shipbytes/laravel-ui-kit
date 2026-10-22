@@ -163,7 +163,7 @@ composer update shipbytes/laravel-ui-kit
    `admin-middleware` module is installed and sets the `is_admin` flag when the
    column exists — whichever mechanisms are present.
 
-3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table (published files, Livewire 4 migration, Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
+3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table (published files, Livewire 4 migration (Livewire version, `Route::livewire` in routes/auth.php, no Volt imports in views, no Volt service provider), Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
 
 > The `UiKitUser` trait used to be a manual step here — the installer now
 > applies it to `app/Models/User.php` itself and only asks you to do it by

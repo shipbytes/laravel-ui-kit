@@ -117,10 +117,12 @@ class DoctorCommand extends Command
         if (! file_exists($routes)) {
             $this->skipCheck('routes/auth.php uses Route::livewire', 'routes/auth.php not published');
         } elseif (str_contains((string) file_get_contents($routes), 'Volt::')) {
-            $this->failCheck('routes/auth.php uses Route::livewire', 'in routes/auth.php replace `Volt::route(` with `Route::livewire(` and delete the `use Livewire\Volt\Volt;` line; also replace `use Livewire\Volt\Component;` with `use Livewire\Component;` in resources/views/livewire/**. The kit\'s Volt shim keeps the old file working until then.');
+            $this->failCheck('routes/auth.php uses Route::livewire', 'in routes/auth.php replace `Volt::route(` with `Route::livewire(` and delete the `use Livewire\Volt\Volt;` line. The kit\'s Volt shim keeps the old file working until then.');
         } else {
             $this->passCheck('routes/auth.php uses Route::livewire');
         }
+
+        $this->checkVoltViews();
 
         $providers = base_path('bootstrap/providers.php');
         $listed = file_exists($providers) && str_contains((string) file_get_contents($providers), 'VoltServiceProvider');
@@ -130,6 +132,43 @@ class DoctorCommand extends Command
         } else {
             $this->passCheck('no Volt service provider');
         }
+    }
+
+    protected function checkVoltViews(): void
+    {
+        $dir = resource_path('views/livewire');
+
+        if (! is_dir($dir)) {
+            $this->skipCheck('views free of Volt imports', 'resources/views/livewire does not exist');
+
+            return;
+        }
+
+        $offending = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS));
+
+        foreach ($files as $file) {
+            /** @var \SplFileInfo $file */
+            if (str_ends_with($file->getFilename(), '.blade.php')
+                && str_contains((string) file_get_contents($file->getPathname()), 'Livewire\Volt')) {
+                $offending[] = 'resources/views/livewire/'.str_replace('\\', '/', substr($file->getPathname(), strlen($dir) + 1));
+            }
+        }
+
+        if ($offending === []) {
+            $this->passCheck('views free of Volt imports');
+
+            return;
+        }
+
+        sort($offending);
+        $listed = implode(', ', array_slice($offending, 0, 5));
+
+        if (count($offending) > 5) {
+            $listed .= ' and '.(count($offending) - 5).' more';
+        }
+
+        $this->failCheck('views free of Volt imports', "replace `use Livewire\\Volt\\Component;` with `use Livewire\\Component;` in {$listed}");
     }
 
     protected function checkFortify(): void
