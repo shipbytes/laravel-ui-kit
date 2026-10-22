@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-boldtext text-zinc-950 dark:text-zinc-50">Users</h1>
+            <h1 class="text-2xl font-sans font-semibold text-zinc-950 dark:text-zinc-50">Users</h1>
             <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $users->total() }} total</p>
         </div>
         <div class="w-72">

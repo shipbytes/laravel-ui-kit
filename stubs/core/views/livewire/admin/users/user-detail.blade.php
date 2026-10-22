@@ -6,7 +6,7 @@
             {{ strtoupper(mb_substr($user->name, 0, 1)) }}
         </div>
         <div>
-            <h1 class="text-2xl font-boldtext text-zinc-950 dark:text-zinc-50">{{ $user->name }}</h1>
+            <h1 class="text-2xl font-sans font-semibold text-zinc-950 dark:text-zinc-50">{{ $user->name }}</h1>
             <p class="text-sm text-zinc-500">{{ $user->email }}</p>
         </div>
     </div>

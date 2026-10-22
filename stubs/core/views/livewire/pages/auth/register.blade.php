@@ -59,8 +59,8 @@ new #[Layout('layouts.guest')] class extends Component
 
 <div>
     <div class="text-center mb-8">
-        <h1 class="text-2xl font-boldtext tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.copy.register.heading') }}</h1>
-        <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-booktext">{{ config('ui-kit.copy.register.subheading') }}</p>
+        <h1 class="text-2xl font-sans font-semibold tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.copy.register.heading') }}</h1>
+        <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">{{ config('ui-kit.copy.register.subheading') }}</p>
     </div>
 
     <form wire:submit="register" class="space-y-5">
@@ -101,7 +101,7 @@ new #[Layout('layouts.guest')] class extends Component
         </button>
     </form>
 
-    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-booktext">
+    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">
         Already have an account?
         <a href="{{ route('login') }}" wire:navigate class="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">Sign in</a>
     </p>

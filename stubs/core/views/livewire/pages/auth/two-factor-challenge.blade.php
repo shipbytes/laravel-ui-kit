@@ -104,9 +104,9 @@ new #[Layout('layouts.guest')] class extends Component
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
             </svg>
         </div>
-        <h1 class="text-2xl font-boldtext tracking-tight text-gray-950 dark:text-zinc-50">Two-factor authentication</h1>
-        <p x-show="!recovery" class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-booktext">Enter the code from your authenticator app.</p>
-        <p x-show="recovery" x-cloak class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-booktext">Enter one of your emergency recovery codes.</p>
+        <h1 class="text-2xl font-sans font-semibold tracking-tight text-gray-950 dark:text-zinc-50">Two-factor authentication</h1>
+        <p x-show="!recovery" class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">Enter the code from your authenticator app.</p>
+        <p x-show="recovery" x-cloak class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">Enter one of your emergency recovery codes.</p>
     </div>
 
     <form wire:submit="login" class="space-y-5">
@@ -129,7 +129,7 @@ new #[Layout('layouts.guest')] class extends Component
         </button>
     </form>
 
-    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-booktext">
+    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">
         <button type="button" x-show="!recovery" @click="recovery = true; $wire.set('code', '')" class="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500">
             Use a recovery code instead
         </button>
