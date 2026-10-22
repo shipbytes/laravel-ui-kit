@@ -58,51 +58,33 @@ new #[Layout('layouts.guest')] class extends Component
 }; ?>
 
 <div>
-    <div class="text-center mb-8">
-        <h1 class="text-2xl font-sans font-semibold tracking-tight text-gray-950 dark:text-zinc-50">{{ config('ui-kit.copy.register.heading') }}</h1>
-        <p class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">{{ config('ui-kit.copy.register.subheading') }}</p>
+    <div class="mb-8 text-center">
+        <h1 class="text-title font-semibold text-fg">{{ config('ui-kit.copy.register.heading') }}</h1>
+        <p class="mt-2 text-body text-fg-muted">{{ config('ui-kit.copy.register.subheading') }}</p>
     </div>
 
     <form wire:submit="register" class="space-y-5">
-        <div>
-            <label for="name" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Name</label>
-            <input wire:model="name" id="name" type="text" name="name" required autofocus autocomplete="name"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
-                   placeholder="Jane Doe">
-            @error('name') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
-        </div>
+        <x-ds::input wire:model="name" id="name" type="text" name="name" label="Name"
+            required autofocus autocomplete="name" placeholder="Jane Doe"
+            :error="$errors->first('name')" />
 
-        <div>
-            <label for="email" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Email</label>
-            <input wire:model="email" id="email" type="email" name="email" required autocomplete="username"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
-                   placeholder="you@example.com">
-            @error('email') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
-        </div>
+        <x-ds::input wire:model="email" id="email" type="email" name="email" label="Email"
+            required autocomplete="username" placeholder="you@example.com"
+            :error="$errors->first('email')" />
 
-        <div>
-            <label for="password" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Password</label>
-            <input wire:model="password" id="password" type="password" name="password" required autocomplete="new-password"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
-                   placeholder="Create a password">
-            @error('password') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
-        </div>
+        <x-ds::input wire:model="password" id="password" type="password" name="password" label="Password"
+            required autocomplete="new-password" placeholder="Create a password"
+            :error="$errors->first('password')" />
 
-        <div>
-            <label for="password_confirmation" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Confirm password</label>
-            <input wire:model="password_confirmation" id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow"
-                   placeholder="Confirm your password">
-            @error('password_confirmation') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
-        </div>
+        <x-ds::input wire:model="password_confirmation" id="password_confirmation" type="password" name="password_confirmation" label="Confirm password"
+            required autocomplete="new-password" placeholder="Confirm your password"
+            :error="$errors->first('password_confirmation')" />
 
-        <button type="submit" class="flex w-full justify-center rounded-full bg-gray-950 dark:bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 dark:hover:bg-indigo-500 transition-all hover:shadow-lg hover:shadow-gray-950/20">
-            Create account
-        </button>
+        <x-ds::button type="submit" class="w-full">Create account</x-ds::button>
     </form>
 
-    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">
+    <p class="mt-6 text-center text-body text-fg-muted">
         Already have an account?
-        <a href="{{ route('login') }}" wire:navigate class="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">Sign in</a>
+        <a href="{{ route('login') }}" wire:navigate class="font-medium text-accent hover:text-accent-hover">Sign in</a>
     </p>
 </div>
