@@ -104,6 +104,14 @@ class ModuleRegistry
             'label' => 'Impersonation (admin-as-user)',
             'summary' => 'Login-as-user from admin, with an exit-impersonation ribbon.',
             'composer' => ['lab404/laravel-impersonate:^1.7.5'],
+            // lab404 ships its two routes (`impersonate`, `impersonate.leave`) as a
+            // router macro the app has to call. routes/ui-kit-user.php is grouped
+            // under web + auth, which is exactly what both routes need: `take` is
+            // guarded by canImpersonate() in the controller, and `leave` has to be
+            // reachable by the impersonated (non-admin) user.
+            'user_routes' => [
+                'Route::impersonate();',
+            ],
             'artisan_publish' => [
                 ['--tag' => 'impersonate'],
             ],

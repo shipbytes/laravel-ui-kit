@@ -135,6 +135,22 @@ class PatchingIdempotencyTest extends TestCase
         $this->assertSame(1, substr_count($contents, "name('profile')"));
     }
 
+    public function test_user_routes_patch_is_idempotent_for_lines_without_a_route_name(): void
+    {
+        $command = $this->makeCommand();
+
+        // The impersonation module injects a macro call, which has no ->name();
+        // the patcher falls back to matching the whole line.
+        $line = 'Route::impersonate();';
+
+        $this->invoke($command, 'patchUserRoutes', [[$line]]);
+        $this->invoke($command, 'patchUserRoutes', [[$line]]);
+
+        $contents = file_get_contents($this->routesDir.'/ui-kit-user.php');
+        $this->assertSame(1, substr_count($contents, $line));
+        $this->assertMatchesRegularExpression('/ui-kit:user-routes-start \*\/\n    Route::impersonate\(\);\n    \/\* ui-kit:user-routes-end/', $contents);
+    }
+
     private function makeCommand(): InstallModuleCommand
     {
         $command = new InstallModuleCommand;

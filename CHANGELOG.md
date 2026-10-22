@@ -19,10 +19,16 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Fixed
 
+- **The impersonation module registers its routes.** `lab404/laravel-impersonate`
+  ships `impersonate` and `impersonate.leave` as a router macro the app has to
+  call; the module now injects `Route::impersonate();` into
+  `routes/ui-kit-user.php` (web + auth) at install, so the partials no longer
+  fail with `Route [impersonate] not defined` on a fresh install. `ui-kit:doctor`
+  gained an `impersonation routes registered` check. Apps that added the macro
+  to `routes/web.php` by hand should remove that line after re-running
+  `ui-kit:install-module impersonation`, or the doctor reports duplicate names.
 - `ContactSubmission` now uses `HasFactory`, so `ContactSubmission::factory()`
   works as the README promised.
-- README: the impersonation module needs `Route::impersonate()` registered in
-  the app; the partials link to those routes.
 
 ## [0.2.1] - 2026-08-20
 
