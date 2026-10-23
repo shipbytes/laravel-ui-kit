@@ -69,6 +69,11 @@ abstract class TestCase extends Orchestra
             'migrations/*_add_two_factor_columns_to_users_table.php',
             'migrations/*_create_passkeys_table.php',
             'migrations/2024_*.php',
+            'migrations/*_activity_log_table.php',
+            'factories/ChangelogEntryFactory.php',
+            'factories/ContactSubmissionFactory.php',
+            'factories/SupportTicketFactory.php',
+            'factories/TicketReplyFactory.php',
         ] as $pattern) {
             foreach (glob(database_path($pattern)) ?: [] as $file) {
                 @unlink($file);

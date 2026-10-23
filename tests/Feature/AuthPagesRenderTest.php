@@ -3,15 +3,14 @@
 namespace Shipbytes\UiKit\Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Testing\TestResponse;
 use Laravel\Fortify\FortifyServiceProvider;
 use Livewire\Livewire;
+use Shipbytes\UiKit\Tests\Concerns\AssertsRendersCleanly;
+use Shipbytes\UiKit\Tests\Concerns\InstallsKitIntoSkeleton;
 use Shipbytes\UiKit\Tests\TestCase;
-use Shipbytes\UiKit\UiKitServiceProvider;
 
 /**
  * Boots a real core install in the Testbench skeleton and renders the
@@ -20,7 +19,8 @@ use Shipbytes\UiKit\UiKitServiceProvider;
  */
 class AuthPagesRenderTest extends TestCase
 {
-    private static bool $autoloaderRegistered = false;
+    use AssertsRendersCleanly;
+    use InstallsKitIntoSkeleton;
 
     protected function getPackageProviders($app): array
     {
@@ -39,69 +39,9 @@ class AuthPagesRenderTest extends TestCase
     {
         parent::setUp();
 
-        $this->withoutVite();
-
-        // The skeleton's App\ namespace isn't autoloaded by Testbench —
-        // register a loader so published Livewire classes + the User model
-        // resolve when pages render.
-        if (! self::$autoloaderRegistered) {
-            spl_autoload_register(function (string $class): void {
-                if (str_starts_with($class, 'App\\')) {
-                    $path = app_path(str_replace('\\', '/', substr($class, 4)).'.php');
-
-                    if (file_exists($path)) {
-                        require $path;
-                    }
-                }
-            });
-
-            self::$autoloaderRegistered = true;
-        }
-
-        // A minimal host-app User model, as every real app has.
-        (new Filesystem)->ensureDirectoryExists(app_path('Models'));
-        file_put_contents(app_path('Models/User.php'), <<<'PHP'
-<?php
-
-namespace App\Models;
-
-use Illuminate\Foundation\Auth\User as Authenticatable;
-
-class User extends Authenticatable
-{
-    protected $table = 'users';
-
-    // The skeleton's own list. NOT $guarded = []: that hid a profile stub
-    // that mass-assigned avatar_path, which a real app silently drops.
-    protected $fillable = ['name', 'email', 'password'];
-
-    protected $hidden = ['password', 'remember_token'];
-}
-PHP);
-
-        (new Filesystem)->ensureDirectoryExists(resource_path('css'));
-        (new Filesystem)->ensureDirectoryExists(resource_path('js'));
-        file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n");
-        file_put_contents(resource_path('js/app.js'), "import './bootstrap';\n");
-
-        $this->loadLaravelMigrations();
-
         // The profile module rides along: it has no composer dependency, and
         // its page is the other half of the screens built on ds:: forms.
-        $this->artisan('ui-kit:install', ['--modules' => 'profile', '--no-interaction' => true])->assertSuccessful();
-
-        // The provider booted before anything was published — load the
-        // published admin config and wire the routes/views up by hand.
-        config(['admin' => require config_path('admin.php')]);
-
-        Livewire::addLocation(viewPath: resource_path('views/livewire'));
-
-        $provider = new UiKitServiceProvider($this->app);
-        $ref = new \ReflectionMethod($provider, 'registerRoutes');
-        $ref->setAccessible(true);
-        $ref->invoke($provider);
-
-        Route::getRoutes()->refreshNameLookups();
+        $this->installKit('profile');
     }
 
     protected function tearDown(): void
@@ -318,28 +258,5 @@ PHP);
             ->assertSee('admin@example.com');
 
         $this->assertRendersCleanly($response);
-    }
-
-    /**
-     * What every rendered page must not contain, whatever page it is.
-     */
-    private function assertRendersCleanly(TestResponse $response): void
-    {
-        $html = (string) $response->getContent();
-
-        // Blade prints a component tag it failed to compile as literal text,
-        // so this is the signature of a broken ds:: call.
-        $this->assertStringNotContainsString('<x-ds::', $html, 'an uncompiled ds:: component tag reached the page');
-
-        // Livewire wraps @if blocks in <!--[if BLOCK]> markers and must keep
-        // them out of opening tags. A marker inside one renders the tag's ">"
-        // as text: blade-ui 1.1's buttons all read "> Sign in" because a
-        // comment in the button named a tag. Fixed upstream in 1.2.0.
-        $found = preg_match('/<([a-zA-Z][\w:.-]*)[^<>]*<!--\[if BLOCK\]>/', $html, $match);
-
-        $this->assertSame(0, $found, $found
-            ? "a Livewire morph marker sits inside an opening <{$match[1]}> tag, so its \">\" renders as text:\n  "
-                .substr(preg_replace('/\s+/', ' ', $match[0]), 0, 200)
-            : '');
     }
 }
