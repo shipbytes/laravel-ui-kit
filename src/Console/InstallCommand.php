@@ -174,6 +174,8 @@ class InstallCommand extends Command
                 file_put_contents($css, $contents);
                 $this->line("  ✓ patched <info>resources/css/app.css</info> <comment>@import './ui-kit.css'</comment>");
             }
+
+            $this->removeSkeletonFont($css);
         } else {
             warning("resources/css/app.css not found — add `@import './ui-kit.css';` to your Tailwind entry CSS yourself.");
         }
@@ -190,6 +192,31 @@ class InstallCommand extends Command
         } else {
             warning("resources/js/app.js not found — add `import './ui-kit';` to your JS entry yourself.");
         }
+    }
+
+    /**
+     * Laravel 12's skeleton app.css ends with an @theme block setting
+     * --font-sans to 'Instrument Sans'. It sits after the kit's import, so it
+     * beats the design system's Inter, and since nothing loads Instrument Sans
+     * the app silently renders in the system font. Only that exact
+     * declaration goes; a font the app chose for itself is left alone.
+     */
+    protected function removeSkeletonFont(string $css): void
+    {
+        $contents = (string) file_get_contents($css);
+
+        // The value runs to the semicolon, across the skeleton's line continuation.
+        $patched = preg_replace("/^[ \t]*--font-sans:\s*['\"]Instrument Sans['\"][^;]*;[ \t]*\R?/m", '', $contents, -1, $removed);
+
+        if (! $removed) {
+            return;
+        }
+
+        // Drop the block if that was all it held, with the blank line before it.
+        $patched = preg_replace('/\R?^@theme\s*\{\s*\}[ \t]*(\R|\z)/m', '', (string) $patched);
+
+        file_put_contents($css, $patched);
+        $this->line("  ✓ removed the skeleton's Instrument Sans --font-sans from app.css <comment>(the design system sets Inter)</comment>");
     }
 
     protected function publishCore(): void

@@ -44,3 +44,12 @@ document.addEventListener('alpine:init', () => {
         },
     });
 });
+
+// wire:navigate copies the next page's html element attributes over this one,
+// and that markup carries neither theme class: the head snippet adds it at
+// runtime and is not re-run on a swap. Without this, every page reached by
+// wire:navigate (the 2FA challenge after login, any wire:navigate link)
+// rendered light whatever the choice. onSwap runs before paint, so no flash.
+document.addEventListener('livewire:navigating', (event) => {
+    event.detail.onSwap(() => window.Alpine.store('theme').apply());
+});

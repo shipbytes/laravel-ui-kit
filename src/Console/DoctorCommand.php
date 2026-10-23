@@ -245,7 +245,36 @@ class DoctorCommand extends Command
             $this->passCheck('no leftover ui-kit-theme.css');
         }
 
+        $this->checkFontOverride();
         $this->checkNavIcons();
+    }
+
+    /**
+     * A --font-sans declared after the ui-kit.css import beats the design
+     * system's Inter. The Laravel 12 skeleton's is Instrument Sans, which
+     * nothing loads, so the app renders in the system font and nothing says so.
+     */
+    protected function checkFontOverride(): void
+    {
+        $check = 'app.css does not override the design system font';
+        $css = resource_path('css/app.css');
+        $contents = file_exists($css) ? (string) file_get_contents($css) : '';
+
+        if (! preg_match("/^@import\s+['\"](?:\.\/)?ui-kit\.css['\"].*$/m", $contents, $import, PREG_OFFSET_CAPTURE)) {
+            $this->skipCheck($check, 'app.css does not import ui-kit.css');
+
+            return;
+        }
+
+        $after = substr($contents, $import[0][1] + strlen($import[0][0]));
+
+        if (preg_match("/--font-sans:\s*['\"]?Instrument Sans/", $after)) {
+            $this->failCheck($check, "delete the @theme { --font-sans: 'Instrument Sans', … } block from resources/css/app.css (nothing loads that font), or re-run php artisan ui-kit:install");
+        } elseif (preg_match('/--font-sans\s*:/', $after)) {
+            $this->skipCheck($check, 'you override the font; make sure it is loaded');
+        } else {
+            $this->passCheck($check);
+        }
     }
 
     protected function checkNavIcons(): void

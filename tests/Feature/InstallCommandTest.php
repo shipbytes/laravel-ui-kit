@@ -191,6 +191,80 @@ PHP);
         $this->artisan('ui-kit:doctor')->assertSuccessful();
     }
 
+    public function test_skeleton_instrument_sans_is_removed_from_app_css(): void
+    {
+        $this->loadLaravelMigrations();
+
+        // Laravel 12's skeleton app.css, verbatim.
+        file_put_contents(resource_path('css/app.css'), <<<'CSS'
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+CSS);
+
+        $this->artisan('ui-kit:install', ['--no-interaction' => true])
+            ->expectsOutputToContain("removed the skeleton's Instrument Sans --font-sans from app.css")
+            ->assertSuccessful();
+
+        $expected = <<<'CSS'
+@import 'tailwindcss';
+@import './ui-kit.css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+CSS;
+
+        $this->assertSame($expected, file_get_contents(resource_path('css/app.css')));
+
+        // Idempotent: a second run finds nothing to remove and changes nothing.
+        $this->artisan('ui-kit:install', ['--no-interaction' => true])
+            ->doesntExpectOutputToContain('Instrument Sans')
+            ->assertSuccessful();
+
+        $this->assertSame($expected, file_get_contents(resource_path('css/app.css')));
+    }
+
+    public function test_a_font_the_app_chose_is_left_alone(): void
+    {
+        $this->loadLaravelMigrations();
+
+        $css = "@import 'tailwindcss';\n\n@theme {\n    --font-sans: 'Geist', ui-sans-serif, sans-serif;\n    --color-brand: #4f46e5;\n}\n";
+        file_put_contents(resource_path('css/app.css'), $css);
+
+        $this->artisan('ui-kit:install', ['--no-interaction' => true])->assertSuccessful();
+
+        $this->assertSame(
+            str_replace("@import 'tailwindcss';", "@import 'tailwindcss';\n@import './ui-kit.css';", $css),
+            file_get_contents(resource_path('css/app.css'))
+        );
+    }
+
+    public function test_only_the_font_goes_when_the_theme_block_holds_more(): void
+    {
+        $this->loadLaravelMigrations();
+
+        file_put_contents(resource_path('css/app.css'), "@import 'tailwindcss';\n\n@theme {\n    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif,\n        'Noto Color Emoji';\n    --color-brand: #4f46e5;\n}\n");
+
+        $this->artisan('ui-kit:install', ['--no-interaction' => true])->assertSuccessful();
+
+        $this->assertSame(
+            "@import 'tailwindcss';\n@import './ui-kit.css';\n\n@theme {\n    --color-brand: #4f46e5;\n}\n",
+            file_get_contents(resource_path('css/app.css'))
+        );
+    }
+
     public function test_unknown_module_aborts_with_failure(): void
     {
         $this->artisan('ui-kit:install', ['--modules' => 'does-not-exist', '--no-interaction' => true])

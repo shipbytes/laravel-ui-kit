@@ -98,43 +98,37 @@ new #[Layout('layouts.guest')] class extends Component
 }; ?>
 
 <div x-data="{ recovery: false }">
-    <div class="text-center mb-8">
-        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 dark:bg-indigo-900/30">
-            <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-            </svg>
+    <div class="mb-8 text-center">
+        <div class="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-accent-tint text-on-accent-tint">
+            <x-ds::icon name="shield-check" size="6" />
         </div>
-        <h1 class="text-2xl font-sans font-semibold tracking-tight text-gray-950 dark:text-zinc-50">Two-factor authentication</h1>
-        <p x-show="!recovery" class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">Enter the code from your authenticator app.</p>
-        <p x-show="recovery" x-cloak class="mt-2 text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">Enter one of your emergency recovery codes.</p>
+        <h1 class="text-title font-semibold text-fg">Two-factor authentication</h1>
+        <p x-show="!recovery" class="mt-2 text-body text-fg-muted">Enter the code from your authenticator app.</p>
+        <p x-show="recovery" x-cloak class="mt-2 text-body text-fg-muted">Enter one of your emergency recovery codes.</p>
     </div>
 
     <form wire:submit="login" class="space-y-5">
         <div x-show="!recovery">
-            <label for="code" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Authentication code</label>
-            <input wire:model="code" id="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123456"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow">
-            @error('code') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+            <x-ds::input wire:model="code" id="code" type="text" label="Authentication code"
+                inputmode="numeric" autocomplete="one-time-code" placeholder="123456"
+                :error="$errors->first('code')" />
         </div>
 
         <div x-show="recovery" x-cloak>
-            <label for="recovery_code" class="block text-sm font-semibold text-gray-950 dark:text-zinc-50 mb-2">Recovery code</label>
-            <input wire:model="recovery_code" id="recovery_code" type="text" autocomplete="one-time-code" placeholder="abcde-12345"
-                   class="block w-full rounded-xl border-0 px-4 py-3 text-sm text-gray-950 dark:text-zinc-50 dark:bg-zinc-800 ring-1 ring-gray-300 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 transition-shadow">
-            @error('recovery_code') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+            <x-ds::input wire:model="recovery_code" id="recovery_code" type="text" label="Recovery code"
+                autocomplete="one-time-code" placeholder="abcde-12345"
+                :error="$errors->first('recovery_code')" />
         </div>
 
-        <button type="submit" class="flex w-full justify-center rounded-full bg-gray-950 dark:bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 dark:hover:bg-indigo-500 transition-all hover:shadow-lg hover:shadow-gray-950/20">
-            Verify
-        </button>
+        <x-ds::button type="submit" class="w-full">Verify</x-ds::button>
     </form>
 
-    <p class="mt-6 text-center text-sm text-gray-500 dark:text-zinc-400 font-sans font-normal">
-        <button type="button" x-show="!recovery" @click="recovery = true; $wire.set('code', '')" class="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500">
+    <div class="mt-6 text-center">
+        <x-ds::button variant="ghost" size="sm" x-show="!recovery" @click="recovery = true; $wire.set('code', '')">
             Use a recovery code instead
-        </button>
-        <button type="button" x-show="recovery" x-cloak @click="recovery = false; $wire.set('recovery_code', '')" class="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500">
+        </x-ds::button>
+        <x-ds::button variant="ghost" size="sm" x-show="recovery" x-cloak @click="recovery = false; $wire.set('recovery_code', '')">
             Use an authentication code instead
-        </button>
-    </p>
+        </x-ds::button>
+    </div>
 </div>
