@@ -1,262 +1,218 @@
-<div>
-    <div class="mb-8">
-        <h1 class="text-2xl/8 font-semibold text-zinc-950 dark:text-zinc-50 sm:text-xl/8">Contact Messages</h1>
-        <p class="mt-2 text-sm/6 text-zinc-500 dark:text-zinc-400">View and manage contact form submissions.</p>
+<div class="space-y-6">
+    <x-ui-kit::page-header title="Contact Messages" subtitle="View and manage contact form submissions." />
 
-        <div class="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
-            <div>
-                <div class="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">Total</div>
-                <div class="mt-2 text-3xl/8 font-semibold text-zinc-950 dark:text-zinc-50">{{ $stats['total'] }}</div>
-            </div>
-            <div>
-                <div class="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">Unread</div>
-                <div class="mt-2 text-3xl/8 font-semibold text-zinc-950 dark:text-zinc-50">{{ $stats['unread'] }}</div>
-            </div>
-            <div>
-                <div class="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">Replied</div>
-                <div class="mt-2 text-3xl/8 font-semibold text-zinc-950 dark:text-zinc-50">{{ $stats['replied'] }}</div>
-            </div>
-            <div>
-                <div class="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">Archived</div>
-                <div class="mt-2 text-3xl/8 font-semibold text-zinc-950 dark:text-zinc-50">{{ $stats['archived'] }}</div>
-            </div>
-        </div>
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <x-ds::stat-tile label="Total" :value="$stats['total']" :countUp="false" />
+        <x-ds::stat-tile label="Unread" :value="$stats['unread']" :countUp="false" />
+        <x-ds::stat-tile label="Replied" :value="$stats['replied']" :countUp="false" />
+        <x-ds::stat-tile label="Archived" :value="$stats['archived']" :countUp="false" />
     </div>
 
-    @if(session('success'))
-        <div class="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:bg-green-900/30 dark:border-green-900 dark:text-green-200">
-            {{ session('success') }}
-        </div>
+    @if (session('success'))
+        <x-ds::alert tone="success">{{ session('success') }}</x-ds::alert>
     @endif
-    @if(session('error'))
-        <div class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/30 dark:border-red-900 dark:text-red-200">
-            {{ session('error') }}
-        </div>
+    @if (session('error'))
+        <x-ds::alert tone="danger">{{ session('error') }}</x-ds::alert>
     @endif
 
-    <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
-        <input
+    <div class="grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
+        <x-ds::input
+            type="search"
+            icon="magnifying-glass"
             wire:model.live.debounce.300ms="search"
-            type="text"
             placeholder="Search by name, email or subject..."
-            class="block w-full rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-        <select wire:model.live="statusFilter" class="block w-full rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            aria-label="Search messages"
+        />
+        <x-ds::input as="select" wire:model.live="statusFilter" aria-label="Status">
             <option value="all">All Messages</option>
             <option value="unread">Unread</option>
             <option value="read">Read</option>
             <option value="replied">Replied</option>
             <option value="archived">Archived</option>
-        </select>
+        </x-ds::input>
     </div>
 
-    @if(count($selected) > 0)
-        <div class="mb-4 flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 dark:bg-indigo-900/30 dark:border-indigo-900 px-4 py-3">
-            <span class="text-sm font-medium text-indigo-700 dark:text-indigo-200">{{ count($selected) }} {{ str('message')->plural(count($selected)) }} selected</span>
-            <span class="text-indigo-300">|</span>
-            <button wire:click="markSelectedAs('read')" class="text-sm font-medium text-indigo-700 dark:text-indigo-200 hover:text-indigo-900">Mark Read</button>
-            <button wire:click="markSelectedAs('unread')" class="text-sm font-medium text-indigo-700 dark:text-indigo-200 hover:text-indigo-900">Mark Unread</button>
-            <button wire:click="archiveSelected" class="text-sm font-medium text-indigo-700 dark:text-indigo-200 hover:text-indigo-900">Archive</button>
-            <button
+    @if (count($selected) > 0)
+        <div class="flex flex-wrap items-center gap-2 rounded-control border border-border bg-accent-wash px-4 py-2">
+            <span class="mr-2 text-body font-medium text-fg">{{ count($selected) }} {{ str('message')->plural(count($selected)) }} selected</span>
+            <x-ds::button variant="ghost" size="sm" wire:click="markSelectedAs('read')">Mark read</x-ds::button>
+            <x-ds::button variant="ghost" size="sm" wire:click="markSelectedAs('unread')">Mark unread</x-ds::button>
+            <x-ds::button variant="ghost" size="sm" wire:click="archiveSelected">Archive</x-ds::button>
+            <x-ds::button
+                variant="ghost"
+                size="sm"
+                tone="danger"
                 wire:click="deleteSelected"
                 wire:confirm="Are you sure you want to delete {{ count($selected) }} selected messages?"
-                class="text-sm font-medium text-red-600 hover:text-red-800"
-            >Delete</button>
+            >Delete</x-ds::button>
         </div>
     @endif
 
-    <ul class="divide-y divide-zinc-950/10 dark:divide-white/10">
-        <li class="py-3 px-1">
-            <label class="flex items-center gap-4">
-                <input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
-                <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Select all</span>
-            </label>
-        </li>
+    {{-- No `columns`: the select-all box lives in the header, so the head is ours. --}}
+    <x-ds::table>
+        <thead class="bg-surface-subtle">
+            <tr>
+                <th scope="col" class="w-12 px-4 py-3">
+                    <x-ds::checkbox label="Select all" :hideLabel="true" wire:model.live="selectAll" />
+                </th>
+                <th scope="col" class="px-4 py-3 text-left text-overline uppercase text-fg-muted">Message</th>
+                <th scope="col" class="px-4 py-3 text-left text-overline uppercase text-fg-muted">Status</th>
+                <th scope="col" class="px-4 py-3 text-left text-overline uppercase text-fg-muted">Received</th>
+                <th scope="col" class="px-4 py-3"><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
 
-        @forelse($submissions as $submission)
-            <li wire:key="submission-{{ $submission->id }}">
-                <div class="flex items-center gap-4 py-4 px-1 hover:bg-zinc-950/[2.5%] dark:hover:bg-white/[2.5%] transition-colors">
-                    <input
-                        type="checkbox"
+        @forelse ($submissions as $submission)
+            <x-ds::table-row wire:key="submission-{{ $submission->id }}">
+                <x-ds::table-cell>
+                    <x-ds::checkbox
+                        :label="'Select '.$submission->subject"
+                        :hideLabel="true"
                         wire:model.live="selected"
-                        value="{{ $submission->id }}"
-                        class="size-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 shrink-0"
-                    >
-
-                    <button wire:click="openModal({{ $submission->id }})" class="flex flex-1 items-center gap-4 text-left min-w-0">
-                        <div class="w-2 shrink-0">
-                            @if($submission->status === 'unread')
-                                <div class="size-2 rounded-full bg-indigo-600"></div>
-                            @endif
-                        </div>
-
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2">
-                                <span class="{{ $submission->status === 'unread' ? 'font-semibold' : 'font-medium' }} text-sm text-zinc-950 dark:text-zinc-50 truncate">{{ $submission->name }}</span>
-                                <span class="text-xs text-zinc-400 truncate hidden sm:inline">&lt;{{ $submission->email }}&gt;</span>
-                                @if($submission->status === 'replied')
-                                    <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 shrink-0">Replied</span>
-                                @elseif($submission->status === 'unread')
-                                    <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20 shrink-0">Unread</span>
-                                @endif
-                                @if($submission->archived_at)
-                                    <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 ring-1 ring-inset ring-zinc-500/20 shrink-0">Archived</span>
-                                @endif
-                            </div>
-                            <div class="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300 truncate {{ $submission->status === 'unread' ? 'font-medium' : '' }}">{{ $submission->subject }}</div>
-                            <div class="mt-0.5 text-xs text-zinc-400 truncate">{{ Str::limit($submission->message, 80) }}</div>
-                        </div>
-
-                        <div class="flex items-center gap-3 shrink-0">
-                            <span class="text-xs text-zinc-400 hidden sm:block">{{ $submission->created_at->diffForHumans() }}</span>
-                            <svg class="size-5 text-zinc-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
-                    </button>
-                </div>
-            </li>
+                        :value="$submission->id"
+                    />
+                </x-ds::table-cell>
+                <x-ds::table-cell>
+                    <div @class([
+                        'text-fg',
+                        'font-semibold' => $submission->status === 'unread',
+                        'font-medium' => $submission->status !== 'unread',
+                    ])>{{ $submission->subject }}</div>
+                    <div class="text-meta text-fg-muted">
+                        {{ $submission->name }}
+                        <span class="max-sm:hidden">&lt;{{ $submission->email }}&gt;</span>
+                    </div>
+                </x-ds::table-cell>
+                <x-ds::table-cell :nowrap="true">
+                    <div class="flex items-center gap-1.5">
+                        <x-ds::badge :tone="$submission->statusTone()">{{ ucfirst($submission->status) }}</x-ds::badge>
+                        @if ($submission->archived_at)
+                            <x-ds::badge>Archived</x-ds::badge>
+                        @endif
+                    </div>
+                </x-ds::table-cell>
+                <x-ds::table-cell :nowrap="true">{{ $submission->created_at->diffForHumans() }}</x-ds::table-cell>
+                <x-ds::table-cell align="right">
+                    <x-ds::button
+                        variant="ghost"
+                        size="sm"
+                        wire:click="openModal({{ $submission->id }})"
+                        aria-label="Open {{ $submission->subject }}"
+                    >Open</x-ds::button>
+                </x-ds::table-cell>
+            </x-ds::table-row>
         @empty
-            <li class="py-16 text-center">
-                <h3 class="text-base/6 font-semibold text-zinc-950 dark:text-zinc-50 mb-1">No messages found</h3>
-                <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">Try adjusting your filters.</p>
-            </li>
+            <tr>
+                <td colspan="5">
+                    <x-ds::empty-state title="No messages found" description="Try adjusting your filters." :bare="true" />
+                </td>
+            </tr>
         @endforelse
-    </ul>
+    </x-ds::table>
 
-    @if($submissions->hasPages())
-        <div class="mt-6">
-            {{ $submissions->links() }}
-        </div>
-    @endif
+    {{ $submissions->links() }}
 
-    @if($showModal && $viewingSubmission)
-        <div
-            class="fixed inset-0 z-50 overflow-y-auto"
-            x-data
-            x-on:keydown.escape.window="$wire.closeModal()"
-        >
-            <div class="fixed inset-0 bg-black/40" wire:click="closeModal"></div>
-
-            <div class="relative flex min-h-full items-start justify-center p-4 pt-16">
-                <div class="relative w-full max-w-2xl rounded-xl bg-white dark:bg-zinc-900 shadow-xl">
-                    <div class="flex items-start justify-between border-b border-zinc-950/10 dark:border-white/10 px-6 py-4">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <h2 class="text-lg font-semibold text-zinc-950 dark:text-zinc-50">{{ $viewingSubmission->subject }}</h2>
-                                @if($viewingSubmission->status === 'replied')
-                                    <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">Replied</span>
-                                @elseif($viewingSubmission->status === 'unread')
-                                    <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">Unread</span>
-                                @else
-                                    <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-inset ring-zinc-500/20">Read</span>
-                                @endif
-                            </div>
-                            <div class="mt-1 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 flex-wrap">
-                                <span class="font-medium text-zinc-700 dark:text-zinc-200">{{ $viewingSubmission->name }}</span>
-                                <span>&lt;{{ $viewingSubmission->email }}&gt;</span>
-                                <span>&middot;</span>
-                                <span>{{ $viewingSubmission->created_at->format('M d, Y \a\t g:i A') }}</span>
-                                @if($viewingSubmission->ip_address)
-                                    <span>&middot;</span>
-                                    <span>IP: {{ $viewingSubmission->ip_address }}</span>
-                                @endif
-                            </div>
-                        </div>
-                        <button wire:click="closeModal" class="ml-4 shrink-0 rounded-lg p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                            <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    <div class="px-6 py-4">
-                        <div class="text-sm text-zinc-700 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed">{{ $viewingSubmission->message }}</div>
-                    </div>
-
-                    <div class="border-t border-zinc-950/5 dark:border-white/5 px-6 py-4">
-                        @if($viewingSubmission->replied_at)
-                            <div class="rounded-lg border border-green-200 bg-green-50/50 p-4 dark:bg-green-900/20 dark:border-green-900">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="text-xs font-medium text-green-700 dark:text-green-200">Your Reply</span>
-                                    <span class="text-xs text-green-600 dark:text-green-300">{{ $viewingSubmission->replied_at->format('M d, Y \a\t g:i A') }}</span>
-                                </div>
-                                <div class="text-sm text-green-800 dark:text-green-100 whitespace-pre-wrap">{{ $viewingSubmission->reply }}</div>
-                            </div>
-                        @else
-                            <label for="reply-text" class="block text-xs font-medium text-zinc-700 dark:text-zinc-200 mb-1.5">Reply to {{ $viewingSubmission->name }}</label>
-                            <textarea
-                                wire:model="replyText"
-                                id="reply-text"
-                                rows="4"
-                                placeholder="Type your reply... (min 10 characters)"
-                                class="block w-full rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y"
-                            ></textarea>
-                            @error('replyText')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                            @enderror
-                            <div class="mt-2 flex justify-end">
-                                <button
-                                    wire:click="submitReply({{ $viewingSubmission->id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="submitReply"
-                                    class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 dark:bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-700 dark:hover:bg-indigo-500 disabled:opacity-50"
-                                >
-                                    <span wire:loading.remove wire:target="submitReply">Send Reply</span>
-                                    <span wire:loading wire:target="submitReply">Sending...</span>
-                                </button>
-                            </div>
+    {{-- The modal's ✕, backdrop and Escape write false to showModal. Entangled,
+         that alone would leave viewingId and the reply draft on the server, so a
+         close that started in the browser also calls closeModal(). A close that
+         started on the server (archive, delete) has already cleared viewingId,
+         and is not sent back. --}}
+    <div
+        x-data="{ showModal: $wire.entangle('showModal') }"
+        x-init="$watch('showModal', open => { if (! open && $wire.viewingId !== null) $wire.closeModal() })"
+    >
+        <x-ds::modal open="showModal" size="2xl" :title="$viewingSubmission?->subject">
+            @if ($viewingSubmission)
+                <div class="space-y-4">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-fg-muted">
+                        <x-ds::badge :tone="$viewingSubmission->statusTone()">{{ ucfirst($viewingSubmission->status) }}</x-ds::badge>
+                        <span class="font-medium text-fg">{{ $viewingSubmission->name }}</span>
+                        <span>&lt;{{ $viewingSubmission->email }}&gt;</span>
+                        <span aria-hidden="true">&middot;</span>
+                        <span>{{ $viewingSubmission->created_at->format('M d, Y \a\t g:i A') }}</span>
+                        @if ($viewingSubmission->ip_address)
+                            <span aria-hidden="true">&middot;</span>
+                            <span>IP: {{ $viewingSubmission->ip_address }}</span>
                         @endif
                     </div>
 
-                    <div class="flex items-center justify-between border-t border-zinc-950/10 dark:border-white/10 px-6 py-4">
-                        <div class="flex items-center gap-2">
-                            @if($senderIsUser && $this->supportTicketsInstalled())
-                                <button
+                    <div class="whitespace-pre-wrap text-body text-fg-body">{{ $viewingSubmission->message }}</div>
+
+                    <div class="border-t border-divider pt-4">
+                        @if ($viewingSubmission->replied_at)
+                            <div class="rounded-control border border-border bg-success-wash p-4">
+                                <div class="mb-2 flex flex-wrap items-center gap-2 text-meta">
+                                    <span class="font-medium text-fg">Your Reply</span>
+                                    <span class="text-fg-muted">{{ $viewingSubmission->replied_at->format('M d, Y \a\t g:i A') }}</span>
+                                </div>
+                                <div class="whitespace-pre-wrap text-body text-fg-body">{{ $viewingSubmission->reply }}</div>
+                            </div>
+                        @else
+                            <div class="space-y-3">
+                                <x-ds::input
+                                    as="textarea"
+                                    wire:model="replyText"
+                                    id="reply-text"
+                                    :rows="4"
+                                    label="Reply to {{ $viewingSubmission->name }}"
+                                    placeholder="Type your reply... (min 10 characters)"
+                                    :error="$errors->first('replyText')"
+                                />
+                                <div class="flex justify-end">
+                                    <x-ds::button
+                                        size="sm"
+                                        wire:click="submitReply({{ $viewingSubmission->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="submitReply"
+                                    >
+                                        <span wire:loading.remove wire:target="submitReply">Send Reply</span>
+                                        <span wire:loading wire:target="submitReply">Sending...</span>
+                                    </x-ds::button>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
+            <x-slot:footer>
+                @if ($viewingSubmission)
+                    <div class="flex w-full flex-wrap items-center justify-between gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                            @if ($senderIsUser && $this->supportTicketsInstalled())
+                                <x-ds::button
+                                    variant="secondary"
+                                    size="sm"
                                     wire:click="copyToTicket({{ $viewingSubmission->id }})"
                                     wire:loading.attr="disabled"
                                     wire:target="copyToTicket"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50"
                                 >
                                     <span wire:loading.remove wire:target="copyToTicket">Copy to Ticket</span>
                                     <span wire:loading wire:target="copyToTicket">Copying...</span>
-                                </button>
+                                </x-ds::button>
                             @endif
 
-                            <button
-                                wire:click="toggleReadStatus({{ $viewingSubmission->id }})"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                            >
+                            <x-ds::button variant="secondary" size="sm" wire:click="toggleReadStatus({{ $viewingSubmission->id }})">
                                 {{ $viewingSubmission->status === 'unread' ? 'Mark Read' : 'Mark Unread' }}
-                            </button>
+                            </x-ds::button>
 
-                            @if($viewingSubmission->archived_at)
-                                <button
-                                    wire:click="unarchiveSubmission({{ $viewingSubmission->id }})"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                                >
-                                    Unarchive
-                                </button>
+                            @if ($viewingSubmission->archived_at)
+                                <x-ds::button variant="secondary" size="sm" wire:click="unarchiveSubmission({{ $viewingSubmission->id }})">Unarchive</x-ds::button>
                             @else
-                                <button
-                                    wire:click="archiveSubmission({{ $viewingSubmission->id }})"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                                >
-                                    Archive
-                                </button>
+                                <x-ds::button variant="secondary" size="sm" wire:click="archiveSubmission({{ $viewingSubmission->id }})">Archive</x-ds::button>
                             @endif
                         </div>
 
-                        <button
+                        <x-ds::button
+                            variant="secondary"
+                            size="sm"
+                            tone="danger"
                             wire:click="deleteSubmission({{ $viewingSubmission->id }})"
                             wire:confirm="Are you sure you want to delete this contact submission?"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-transparent px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                        >
-                            Delete
-                        </button>
+                        >Delete</x-ds::button>
                     </div>
-                </div>
-            </div>
-        </div>
-    @endif
+                @endif
+            </x-slot:footer>
+        </x-ds::modal>
+    </div>
 </div>
