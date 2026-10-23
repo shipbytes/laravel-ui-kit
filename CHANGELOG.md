@@ -10,6 +10,8 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-23
+
 0.4.0 moves the kit onto the Shipbytes design system (`shipbytes/blade-ui`).
 The layouts, the shared components, the seven auth pages, the profile page and
 the nine admin screens are all built from its `ds::` components and semantic
@@ -518,7 +520,8 @@ matrix.
 Laravel 10/11, moved to Tailwind v4, and fixed the install-breaking bugs
 found in audit — see its notes before upgrading.
 
-[Unreleased]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/shipbytes/laravel-ui-kit/compare/v0.2.0...v0.2.1
