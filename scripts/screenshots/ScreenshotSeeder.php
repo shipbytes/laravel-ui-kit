@@ -100,6 +100,29 @@ class ScreenshotSeeder extends Seeder
             ]);
         }
 
+        // Linus's own list on /support: the open ticket above, plus two settled ones.
+        foreach ([
+            ['How do I add a second admin?', 'general', 'low', 'resolved', 9],
+            ['Request: export to XLSX', 'feature_request', 'low', 'closed', 16],
+        ] as [$subject, $category, $priority, $status, $days]) {
+            $ticket = SupportTicket::factory()->create([
+                'user_id' => $users[0]->id,
+                'subject' => $subject,
+                'category' => $category,
+                'priority' => $priority,
+                'status' => $status,
+                'closed_at' => now()->subDays($days - 2),
+                'created_at' => now()->subDays($days),
+                'updated_at' => now()->subDays($days - 2),
+            ]);
+            TicketReply::factory()->create([
+                'ticket_id' => $ticket->id,
+                'user_id' => $users[0]->id,
+                'message' => 'Could you point me to where this lives in the settings?',
+                'created_at' => now()->subDays($days),
+            ]);
+        }
+
         $entries = [
             ['Scheduled exports', 'feature', 'Reports can now be emailed on a daily, weekly or monthly schedule.'],
             ['Faster dashboard loads', 'improvement', 'The overview now renders in under 200 ms on accounts with more than 50,000 records.'],
