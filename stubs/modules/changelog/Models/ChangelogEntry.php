@@ -35,10 +35,16 @@ class ChangelogEntry extends Model
         });
     }
 
+    /**
+     * Published and dated today or earlier. whereDate, not where: the date
+     * cast stores "2026-10-23 00:00:00", and on SQLite (Laravel 12's default)
+     * that string is greater than "2026-10-23", so a plain comparison hid every
+     * entry dated today until tomorrow.
+     */
     public function scopePublished($query)
     {
         return $query->where('is_published', true)
-            ->where('published_at', '<=', now()->toDateString());
+            ->whereDate('published_at', '<=', now()->toDateString());
     }
 
     /**
