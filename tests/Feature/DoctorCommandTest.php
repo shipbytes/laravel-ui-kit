@@ -231,6 +231,7 @@ PHP);
 
         $this->assertMatchesRegularExpression('/nav icons are Heroicons\s*\|\s*✗ fail\s*\|.*Dashboard => grid, Changelog => note\./u', $output);
         $this->assertStringContainsString('grid → squares-2x2', $output);
+        $this->assertStringContainsString('the sidebar shows a question-mark icon for each of them', $output);
         $this->assertStringNotContainsString('Users => users', $output);
     }
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\Features;
+use Shipbytes\BladeUi\Support\Icons;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
 use Shipbytes\UiKit\Support\DefaultBadgeResolver;
 use Shipbytes\UiKit\Support\ModuleRegistry;
@@ -462,10 +463,14 @@ class DoctorCommand extends Command
         }
     }
 
+    /**
+     * The sidebar passes these names to ds::icon with a fallback, so a bad one
+     * no longer fails the page; it draws a question mark, which is easy to miss.
+     * Icons::exists() resolves aliases and asks blade-icons exactly as the
+     * render does, so this row and the sidebar agree.
+     */
     protected function checkNavIcons(): void
     {
-        $svgDir = base_path('vendor/blade-ui-kit/blade-heroicons/resources/svg');
-        $aliases = (array) config('blade-ui.icon_aliases', []);
         $bad = [];
 
         foreach ((array) config('admin.nav', []) as $item) {
@@ -473,17 +478,15 @@ class DoctorCommand extends Command
                 continue;
             }
 
-            $icon = $item['icon'];
-
-            if (! file_exists("{$svgDir}/o-{$icon}.svg") && ! array_key_exists($icon, $aliases)) {
-                $bad[] = ($item['label'] ?? '?').' => '.$icon;
+            if (! Icons::exists($item['icon'])) {
+                $bad[] = ($item['label'] ?? '?').' => '.$item['icon'];
             }
         }
 
         if ($bad === []) {
             $this->passCheck('nav icons are Heroicons');
         } else {
-            $this->failCheck('nav icons are Heroicons', 'not found: '.implode(', ', $bad).'. 0.4 switched nav icons to Heroicons v2 names (heroicons.com); e.g. grid → squares-2x2, note → document-text, mail → envelope, history → clock');
+            $this->failCheck('nav icons are Heroicons', 'not found: '.implode(', ', $bad).'. 0.4 switched nav icons to Heroicons v2 names (heroicons.com); e.g. grid → squares-2x2, note → document-text, mail → envelope, history → clock. Meanwhile the sidebar shows a question-mark icon for each of them');
         }
     }
 

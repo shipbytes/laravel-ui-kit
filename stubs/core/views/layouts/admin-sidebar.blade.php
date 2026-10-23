@@ -79,7 +79,7 @@
                                         collapsedWhen="$store.sidebar.collapsed"
                                         wire:navigate
                                     >
-                                        <x-slot:icon><x-ds::icon :name="$item['icon'] ?? 'squares-2x2'" /></x-slot:icon>
+                                        <x-slot:icon><x-ds::icon :name="$item['icon'] ?? 'squares-2x2'" fallback="question-mark-circle" /></x-slot:icon>
                                     </x-ds::nav-item>
                                 @endif
                             @endforeach
@@ -146,7 +146,7 @@
                         :badge="isset($item['badge']) ? ($badges[$item['badge']] ?? null) : null"
                         wire:navigate
                     >
-                        <x-slot:icon><x-ds::icon :name="$item['icon'] ?? 'squares-2x2'" size="6" /></x-slot:icon>
+                        <x-slot:icon><x-ds::icon :name="$item['icon'] ?? 'squares-2x2'" fallback="question-mark-circle" size="6" /></x-slot:icon>
                     </x-ds::bottom-nav-item>
                 @endforeach
                 <x-ds::bottom-nav-item label="More" @click="moreSheetOpen = true">
@@ -165,7 +165,7 @@
                             wire:navigate
                             @click="moreSheetOpen = false"
                         >
-                            <x-slot:icon><x-ds::icon :name="$item['icon'] ?? 'squares-2x2'" size="5" /></x-slot:icon>
+                            <x-slot:icon><x-ds::icon :name="$item['icon'] ?? 'squares-2x2'" fallback="question-mark-circle" size="5" /></x-slot:icon>
                         </x-ds::sheet-item>
                     @endforeach
 

@@ -10,6 +10,8 @@ use App\Models\ContactSubmission;
 use App\Models\SupportTicket;
 use App\Models\TicketReply;
 use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Laravel\Fortify\FortifyServiceProvider;
 use Livewire\Livewire;
 use Mews\Purifier\PurifierServiceProvider;
@@ -198,6 +200,55 @@ class AdminPagesRenderTest extends TestCase
             ->assertSet('paginators.page', 1)
             ->assertSee('needle@example.com')
             ->assertDontSee('member7@example.com');
+    }
+
+    public function test_an_unknown_nav_icon_degrades_to_a_question_mark(): void
+    {
+        $path = fn (string $icon) => $this->heroiconPath($icon);
+
+        $before = (string) $this->actingAs($this->admin)->get('/admin')->getContent();
+        $usersIcons = substr_count($before, $path('users'));
+
+        // A 0.3 app's name on the second entry. Before 0.5.2 every admin page,
+        // this one included, was a 500.
+        config(['admin.nav' => [
+            ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'squares-2x2'],
+            ['label' => 'Users', 'route' => 'admin.users.index', 'icon' => 'grid'],
+        ]]);
+
+        Log::spy();
+
+        $response = $this->actingAs($this->admin)->get('/admin');
+
+        $this->assertSame(200, $response->status(), "/admin answered {$response->status()}");
+        $html = (string) $response->getContent();
+
+        $this->assertGreaterThan(0, $usersIcons);
+        $this->assertSame(0, substr_count($before, $path('question-mark-circle')));
+        // Every place the entry was drawn now draws the question mark...
+        $this->assertSame($usersIcons, substr_count($html, $path('question-mark-circle')));
+        // ...and not the sidebar's `?? 'squares-2x2'` default, which would put
+        // the Dashboard icon on two entries and hide that anything is wrong.
+        $this->assertSame(substr_count($before, $path('squares-2x2')), substr_count($html, $path('squares-2x2')));
+        $this->assertRendersCleanly($response);
+
+        Log::shouldHaveReceived('warning')
+            ->once()
+            ->with('blade-ui: icon "grid" not found, rendered "question-mark-circle"');
+
+        Artisan::call('ui-kit:doctor');
+
+        $this->assertMatchesRegularExpression('/nav icons are Heroicons\s*\|\s*✗ fail\s*\|.*Users => grid\./u', Artisan::output());
+    }
+
+    /** The first path of a Heroicons v2 outline icon, which identifies it in the markup. */
+    private function heroiconPath(string $icon): string
+    {
+        $svg = (string) file_get_contents(__DIR__."/../../vendor/blade-ui-kit/blade-heroicons/resources/svg/o-{$icon}.svg");
+
+        preg_match('/ d="([^"]+)"/', $svg, $m);
+
+        return $m[1];
     }
 
     /**

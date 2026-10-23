@@ -34,8 +34,8 @@ return [
     | Modules append their own entries via the install command.
     | `icon` is a Heroicons v2 outline name (https://heroicons.com), rendered
     | through the design system's ds::icon, e.g. 'squares-2x2', 'users',
-    | 'document-text'. `php artisan ui-kit:doctor` flags a name that does not
-    | resolve.
+    | 'document-text'. A name that does not resolve shows a question-mark icon
+    | rather than failing the page; `php artisan ui-kit:doctor` names it.
     */
 
     'nav' => [
