@@ -70,6 +70,10 @@ class SupportTicketTest extends InstalledKitTestCase
         $this->actingAs($this->owner)->get('/support?status=closed')
             ->assertSee('All sorted now')
             ->assertDontSee('Still broken');
+
+        $this->actingAs($this->owner)->get('/support?status=nonsense')
+            ->assertSee('All sorted now')
+            ->assertSee('Still broken');
     }
 
     public function test_an_empty_list_offers_a_new_ticket(): void

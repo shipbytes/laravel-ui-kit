@@ -33,6 +33,11 @@ class TicketList extends Component
 
     public function render()
     {
+        // A status the list does not know, typed into the URL, shows them all.
+        if (! array_key_exists($this->statusFilter, $this->statusOptions)) {
+            $this->statusFilter = 'all';
+        }
+
         $mine = SupportTicket::query()->where('user_id', Auth::id());
 
         $tickets = (clone $mine)
