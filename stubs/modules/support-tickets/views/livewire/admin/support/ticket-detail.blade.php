@@ -11,6 +11,9 @@
     @if (session()->has('success'))
         <x-ds::alert tone="success">{{ session('success') }}</x-ds::alert>
     @endif
+    @if (session()->has('error'))
+        <x-ds::alert tone="danger">{{ session('error') }}</x-ds::alert>
+    @endif
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="space-y-6 lg:col-span-2">

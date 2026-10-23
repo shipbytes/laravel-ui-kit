@@ -45,8 +45,9 @@ Do not merge anything red, and prefer a branch + PR so that job runs before mast
 ## Rules when changing the kit
 
 1. **Everything an install must do goes through `ModuleRegistry`.** Keys: `composer`,
-   `admin_routes`, `user_routes`, `admin_nav`, `admin_middleware_swap`, `artisan_publish`,
-   `artisan_seed`, `storage_link`, `post_install_notes`. If a module needs a line in a
+   `admin_routes`, `user_routes` (web + auth), `public_routes` (web only, guests too),
+   `admin_nav`, `admin_middleware_swap`, `artisan_publish`, `artisan_seed`, `storage_link`,
+   `mail` (mailable => markdown view, checked by the doctor), `post_install_notes`. If a module needs a line in a
    routes file, declare it there; never document "add this line yourself". Route patches
    are idempotent by route name or whole-line match — add a `PatchingIdempotencyTest` case
    for a new shape of line. The impersonation module shipped two releases without its

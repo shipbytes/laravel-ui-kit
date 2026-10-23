@@ -41,15 +41,25 @@ class ChangelogEntry extends Model
             ->where('published_at', '<=', now()->toDateString());
     }
 
-    public function getCategoryLabelAttribute(): string
+    /**
+     * The categories, key => label, in the order the public page's filter
+     * lists them.
+     *
+     * @return array<string, string>
+     */
+    public static function categories(): array
     {
-        return match ($this->category) {
+        return [
             'feature' => 'New Feature',
             'improvement' => 'Improvement',
             'fix' => 'Bug Fix',
             'other' => 'Other',
-            default => ucfirst((string) $this->category),
-        };
+        ];
+    }
+
+    public function getCategoryLabelAttribute(): string
+    {
+        return static::categories()[$this->category] ?? ucfirst((string) $this->category);
     }
 
     /**

@@ -64,6 +64,44 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Mail
+    |--------------------------------------------------------------------------
+    |
+    | Who gets the mail meant for the site's admins: a new support ticket, a
+    | user's reply, a contact-form message. Empty means every admin user (the
+    | `admin` role with the admin-middleware module, else is_admin). Listing
+    | addresses here replaces that list, e.g. a shared support mailbox:
+    | UI_KIT_ADMIN_ADDRESSES="support@example.com,ops@example.com"
+    */
+
+    'mail' => [
+        'admin_addresses' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('UI_KIT_ADMIN_ADDRESSES', ''))
+        ))),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Contact form (contacts module)
+    |--------------------------------------------------------------------------
+    |
+    | The subjects a visitor picks from on /contact. The chosen label is what
+    | the admin inbox shows and what the mail's subject line carries.
+    */
+
+    'contacts' => [
+        'subjects' => [
+            'General question',
+            'Account or billing',
+            'Problem report',
+            'Feature suggestion',
+            'Something else',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Installed modules (managed by ui-kit:install-module)
     |--------------------------------------------------------------------------
     |

@@ -168,5 +168,9 @@ jobs:
           curl -fsS http://127.0.0.1:8787/register | grep -q "Create your account"
           code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/admin)
           test "$code" = "302" || { echo "/admin expected 302 for guests, got $code"; exit 1; }
+          curl -fsS http://127.0.0.1:8787/contact | grep -q "Contact us"
+          curl -fsS http://127.0.0.1:8787/changelog | grep -q "Changelog"
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/support)
+          test "$code" = "302" || { echo "/support expected 302 for guests, got $code"; exit 1; }
           curl -fsS http://127.0.0.1:8787/ > /dev/null
           echo "smoke OK"

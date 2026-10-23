@@ -10,7 +10,9 @@ use Shipbytes\UiKit\Console\InstallCommand;
 use Shipbytes\UiKit\Console\InstallModuleCommand;
 use Shipbytes\UiKit\Tests\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\NullOutput;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class PatchingIdempotencyTest extends TestCase
 {
@@ -154,6 +156,59 @@ class PatchingIdempotencyTest extends TestCase
         $this->assertMatchesRegularExpression('/ui-kit:user-routes-start \*\/\n    Route::impersonate\(\);\n    \/\* ui-kit:user-routes-end/', $contents);
     }
 
+    public function test_public_routes_patch_is_idempotent_and_lands_in_the_guest_group(): void
+    {
+        $command = $this->makeCommand();
+
+        $contact = "Route::get('contact', \\App\\Livewire\\ContactForm::class)->name('contact');";
+        $changelog = "Route::get('changelog', \\App\\Livewire\\Changelog\\PublicChangelog::class)->name('changelog.public');";
+
+        $this->invoke($command, 'patchPublicRoutes', [[$contact]]);
+        $this->invoke($command, 'patchPublicRoutes', [[$changelog, $contact]]);
+        $this->invoke($command, 'patchPublicRoutes', [[$changelog]]);
+
+        $contents = file_get_contents($this->routesDir.'/ui-kit-user.php');
+        $this->assertSame(1, substr_count($contents, "name('contact')"));
+        $this->assertSame(1, substr_count($contents, "name('changelog.public')"));
+
+        // Both lines sit in the web-only group, ahead of the web + auth one.
+        $this->assertMatchesRegularExpression(
+            "/Route::middleware\\(\\['web'\\]\\)->group\\(function \\(\\) \\{\\n    \\/\\* ui-kit:public-routes-start \\*\\/\\n    Route::get\\('contact'.*\\n    Route::get\\('changelog'.*\\n    \\/\\* ui-kit:public-routes-end \\*\\/\\n\\}\\);/",
+            $contents
+        );
+        $this->assertLessThan(strpos($contents, "['web', 'auth']"), strpos($contents, "name('changelog.public')"));
+
+        exec(PHP_BINARY.' -l '.escapeshellarg($this->routesDir.'/ui-kit-user.php').' 2>&1', $lint, $code);
+        $this->assertSame(0, $code, implode("\n", $lint));
+    }
+
+    public function test_public_routes_patch_leaves_a_file_from_before_0_5_alone(): void
+    {
+        // 0.4's file: one web + auth group, no public block.
+        $old = <<<'PHP'
+<?php
+
+// ui-kit:managed
+
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['web', 'auth'])->group(function () {
+    /* ui-kit:user-routes-start */
+    /* ui-kit:user-routes-end */
+});
+PHP;
+        file_put_contents($this->routesDir.'/ui-kit-user.php', $old);
+
+        $output = new BufferedOutput;
+        $command = $this->makeCommand(output: $output);
+
+        $this->invoke($command, 'patchPublicRoutes', [["Route::get('contact', \\App\\Livewire\\ContactForm::class)->name('contact');"]]);
+
+        // Never into the auth group: a guest could not reach the contact form.
+        $this->assertSame($old, file_get_contents($this->routesDir.'/ui-kit-user.php'));
+        $this->assertStringContainsString('has no public-routes block', $output->fetch());
+    }
+
     public function test_fortify_features_patch_is_idempotent(): void
     {
         // Fortify's own published stub, whose passkeys() call spans three lines.
@@ -233,13 +288,13 @@ class PatchingIdempotencyTest extends TestCase
         @unlink(app_path('Models/User.php'));
     }
 
-    private function makeCommand(?Command $command = null): Command
+    private function makeCommand(?Command $command = null, ?OutputInterface $output = null): Command
     {
         $command ??= new InstallModuleCommand;
         $command->setLaravel($this->app);
 
         // Wire a no-op output so $this->line() / $this->warn() don't blow up.
-        $output = new NullOutput;
+        $output ??= new NullOutput;
         $command->setOutput(new OutputStyle(
             new ArrayInput([]),
             $output

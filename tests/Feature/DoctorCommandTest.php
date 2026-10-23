@@ -2,6 +2,7 @@
 
 namespace Shipbytes\UiKit\Tests\Feature;
 
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
@@ -356,6 +357,66 @@ PHP);
         } finally {
             file_put_contents($app, $original);
             $this->app['env'] = 'testing';
+        }
+    }
+
+    public function test_the_public_routes_block_is_needed_once_a_module_adds_a_public_page(): void
+    {
+        $check = preg_quote('routes/ui-kit-user.php has the public-routes block', '/');
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*– skip\\s*\\|\\s*routes\\/ui-kit-user\\.php not published/u", $this->doctor());
+
+        // The file 0.4 published: one web + auth group.
+        file_put_contents(base_path('routes/ui-kit-user.php'), "<?php\n\nRoute::middleware(['web', 'auth'])->group(function () {\n    /* ui-kit:user-routes-start */\n    /* ui-kit:user-routes-end */\n});\n");
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*– skip\\s*\\|\\s*no installed module adds a public page/u", $this->doctor());
+
+        config(['ui-kit.installed_modules' => ['profile', 'contacts', 'changelog']]);
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|.*ui-kit:install --force.*ui-kit:install-module contacts changelog/u", $this->doctor());
+
+        copy(__DIR__.'/../../stubs/core/routes/ui-kit-user.php', base_path('routes/ui-kit-user.php'));
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✓ pass/u", $this->doctor());
+    }
+
+    public function test_a_module_missing_its_routes_mail_or_policy_fails(): void
+    {
+        config(['ui-kit.installed_modules' => ['support-tickets', 'contacts']]);
+
+        // The class may already be loaded by an earlier test in this process;
+        // the view is missing either way.
+        $output = $this->doctor();
+        $this->assertMatchesRegularExpression('/contacts routes registered\s*\|\s*✗ fail\s*\|\s*missing: admin\.contacts\.index, contact\./u', $output);
+        $this->assertMatchesRegularExpression('/contacts mail views published\s*\|\s*✗ fail\s*\|\s*missing: (App\\\\Mail\\\\ContactSubmittedMail, )?resources\/views\/mail\/contact\/submitted\.blade\.php/u', $output);
+        $this->assertMatchesRegularExpression('/support ticket policy published\s*\|\s*✗ fail\s*\|.*403/u', $output);
+
+        // What the installer puts in place.
+        foreach (['support-tickets', 'contacts'] as $module) {
+            $stubs = __DIR__."/../../stubs/modules/{$module}";
+            (new Filesystem)->copyDirectory("{$stubs}/Mail", app_path('Mail'));
+            (new Filesystem)->copyDirectory("{$stubs}/views/mail", resource_path('views/mail'));
+        }
+        (new Filesystem)->copyDirectory(__DIR__.'/../../stubs/modules/support-tickets/Policies', app_path('Policies'));
+        spl_autoload_register($loader = function (string $class): void {
+            $path = app_path(str_replace('\\', '/', substr($class, 4)).'.php');
+
+            if (str_starts_with($class, 'App\\') && file_exists($path)) {
+                require_once $path;
+            }
+        });
+
+        foreach (['admin.support.index', 'admin.support.show', 'support.index', 'support.create', 'support.show', 'admin.contacts.index', 'contact'] as $name) {
+            Route::get('/'.str_replace('.', '/', $name), fn () => 'ok')->name($name);
+        }
+        Route::getRoutes()->refreshNameLookups();
+
+        try {
+            $output = $this->doctor();
+
+            foreach (['support-tickets routes registered', 'support-tickets mail views published', 'contacts routes registered', 'contacts mail views published', 'support ticket policy published'] as $row) {
+                $this->assertMatchesRegularExpression('/'.preg_quote($row, '/').'\s*\|\s*✓ pass/u', $output);
+            }
+        } finally {
+            spl_autoload_unregister($loader);
         }
     }
 

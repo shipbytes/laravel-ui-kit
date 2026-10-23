@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Contacts;
 
+use App\Mail\ContactReplyMail;
 use App\Models\ContactSubmission;
 use App\Models\SupportTicket;
 use App\Models\TicketReply;
@@ -9,6 +10,7 @@ use App\Models\User;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination;
+use Shipbytes\UiKit\Support\UiKit;
 
 class ContactList extends Component
 {
@@ -101,12 +103,14 @@ class ContactList extends Component
             'status' => 'replied',
         ]);
 
-        // Bring your own Mailable:
-        // Mail::to($submission->email)->queue(new \App\Mail\ContactReply($submission));
-
         $this->replyText = '';
 
-        session()->flash('success', 'Reply saved for '.$submission->name.'.');
+        // Saved first: a mail that fails is logged and never loses the reply.
+        if ($failure = UiKit::sendMail($submission->email, new ContactReplyMail($submission))) {
+            session()->flash('error', 'Reply saved, but the email failed: '.$failure->getMessage());
+        } else {
+            session()->flash('success', 'Reply sent to '.$submission->email.'.');
+        }
     }
 
     public function toggleReadStatus(int $id): void

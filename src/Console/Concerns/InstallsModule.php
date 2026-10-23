@@ -82,6 +82,8 @@ trait InstallsModule
             'views' => resource_path('views'),
             'Livewire' => app_path('Livewire'),
             'Models' => app_path('Models'),
+            'Mail' => app_path('Mail'),
+            'Policies' => app_path('Policies'),
             'Http' => app_path('Http'),
             'migrations' => database_path('migrations'),
             'database' => database_path(),
@@ -542,7 +544,8 @@ PHP;
     }
 
     /**
-     * Inject route lines into routes/ui-kit-user.php (if published).
+     * Inject route lines into routes/ui-kit-user.php (if published), in its
+     * web + auth group.
      *
      * @param  array<int, string>  $lines
      */
@@ -558,9 +561,28 @@ PHP;
     }
 
     /**
+     * Inject route lines into the web-only group of routes/ui-kit-user.php,
+     * for pages a guest can open. A file published before 0.5 has no such
+     * group, so the patch warns and skips; ui-kit:doctor reports it.
+     *
      * @param  array<int, string>  $lines
      */
-    protected function patchRoutesFile(string $path, string $startMarker, string $endMarker, array $lines, int $indent): void
+    protected function patchPublicRoutes(array $lines): void
+    {
+        $this->patchRoutesFile(
+            base_path('routes/ui-kit-user.php'),
+            '/* ui-kit:public-routes-start */',
+            '/* ui-kit:public-routes-end */',
+            $lines,
+            indent: 4,
+            missingHint: 'routes/ui-kit-user.php has no public-routes block (it predates 0.5), so /contact and /changelog were not added. Re-run php artisan ui-kit:install --force, or add the block by hand (see the upgrade notes).'
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $lines
+     */
+    protected function patchRoutesFile(string $path, string $startMarker, string $endMarker, array $lines, int $indent, ?string $missingHint = null): void
     {
         if (empty($lines)) {
             return;
@@ -575,7 +597,7 @@ PHP;
         $contents = file_get_contents($path);
 
         if (! str_contains($contents, $startMarker) || ! str_contains($contents, $endMarker)) {
-            $this->warn(basename($path).' is missing ui-kit route markers; skipping patch.');
+            $this->warn($missingHint ?? basename($path).' is missing ui-kit route markers; skipping patch.');
 
             return;
         }
