@@ -16,7 +16,13 @@ class ModuleRegistry
      *       /* ui-kit:admin-routes-start *\/  ...  /* ui-kit:admin-routes-end *\/
      *     in routes/admin.php
      *   - admin_nav: array of nav-array entries to merge into config/admin.php
-     *   - user_routes: array of route lines to inject into routes/ui-kit-user.php
+     *   - user_routes: array of route lines to inject into routes/ui-kit-user.php,
+     *       inside its web + auth group (signed-in users only)
+     *   - public_routes: array of route lines to inject into routes/ui-kit-user.php,
+     *       inside its web-only group (guests too), between
+     *       /* ui-kit:public-routes-start *\/  ...  /* ui-kit:public-routes-end *\/
+     *   - mail: mailable class => markdown view, for each mail the module sends;
+     *       ui-kit:doctor checks both were published
      *   - admin_middleware_swap: when true, replace EnsureIsAdminFallback::class
      *       with App\Http\Middleware\EnsureUserIsAdmin::class
      *   - artisan_publish: list of vendor:publish argument arrays
@@ -42,7 +48,13 @@ class ModuleRegistry
         ],
         'support-tickets' => [
             'label' => 'Support Tickets',
-            'summary' => 'Admin ticket queue with replies, status filters, and open-count sidebar badge.',
+            'summary' => 'Users open and follow tickets at /support; admins answer them from a queue with an open-count badge. Both sides are mailed.',
+            'user_routes' => [
+                // support/create before support/{ulid}, or "create" is read as a ulid.
+                "Route::get('support', \\App\\Livewire\\Support\\TicketList::class)->name('support.index');",
+                "Route::get('support/create', \\App\\Livewire\\Support\\CreateTicket::class)->name('support.create');",
+                "Route::get('support/{ulid}', \\App\\Livewire\\Support\\TicketDetail::class)->name('support.show');",
+            ],
             'admin_routes' => [
                 "Route::get('support', \\App\\Livewire\\Admin\\Support\\TicketList::class)->name('support.index');",
                 "Route::get('support/{ulid}', \\App\\Livewire\\Admin\\Support\\TicketDetail::class)->name('support.show');",
@@ -50,18 +62,26 @@ class ModuleRegistry
             'admin_nav' => [
                 ['label' => 'Support', 'route' => 'admin.support.index', 'icon' => 'ticket', 'badge' => 'open_tickets'],
             ],
+            'mail' => [
+                'App\\Mail\\NewTicketMail' => 'mail.support.new-ticket',
+                'App\\Mail\\TicketReplyMail' => 'mail.support.ticket-reply',
+                'App\\Mail\\TicketStatusChangedMail' => 'mail.support.status-changed',
+            ],
             'post_install_notes' => [
-                'Optional: wire email notifications — the module ships without Mailables so you can plug in your own.',
+                'Mail goes through your queue: run `php artisan queue:work` unless QUEUE_CONNECTION=sync, and set MAIL_FROM_ADDRESS. Admin mail goes to every admin, or to UI_KIT_ADMIN_ADDRESSES when set.',
             ],
         ],
         'changelog' => [
             'label' => 'Changelog',
-            'summary' => 'Admin-authored changelog entries with a public feed endpoint.',
+            'summary' => 'Admin-authored changelog entries, published at /changelog with a category filter.',
             'composer' => ['mews/purifier:^3.4'],
             'admin_routes' => [
                 "Route::get('changelog', \\App\\Livewire\\Admin\\Changelog\\ChangelogList::class)->name('changelog.index');",
                 "Route::get('changelog/create', \\App\\Livewire\\Admin\\Changelog\\ChangelogForm::class)->name('changelog.create');",
                 "Route::get('changelog/{ulid}/edit', \\App\\Livewire\\Admin\\Changelog\\ChangelogForm::class)->name('changelog.edit');",
+            ],
+            'public_routes' => [
+                "Route::get('changelog', \\App\\Livewire\\Changelog\\PublicChangelog::class)->name('changelog.public');",
             ],
             'admin_nav' => [
                 ['label' => 'Changelog', 'route' => 'admin.changelog.index', 'icon' => 'document-text'],
@@ -69,22 +89,26 @@ class ModuleRegistry
             'artisan_publish' => [
                 ['--provider' => 'Mews\\Purifier\\PurifierServiceProvider'],
             ],
-            'post_install_notes' => [
-                'Optional public feed: add to routes/web.php — Route::get(\'changelog\', fn () => view(\'changelog.public\', [\'entries\' => \\App\\Models\\ChangelogEntry::published()->orderBy(\'published_at\', \'desc\')->get()]))->name(\'changelog.public\'); (you supply the changelog.public view).',
-            ],
         ],
         'contacts' => [
             'label' => 'Contacts',
-            'summary' => 'Inbox for public contact-form submissions.',
+            'summary' => 'A public contact form at /contact and the admin inbox it fills, with replies sent by mail.',
+            'public_routes' => [
+                "Route::get('contact', \\App\\Livewire\\ContactForm::class)->name('contact');",
+            ],
             'admin_routes' => [
                 "Route::get('contacts', \\App\\Livewire\\Admin\\Contacts\\ContactList::class)->name('contacts.index');",
             ],
             'admin_nav' => [
                 ['label' => 'Contacts', 'route' => 'admin.contacts.index', 'icon' => 'envelope', 'badge' => 'unread_contacts'],
             ],
+            'mail' => [
+                'App\\Mail\\ContactSubmittedMail' => 'mail.contact.submitted',
+                'App\\Mail\\ContactConfirmationMail' => 'mail.contact.confirmation',
+                'App\\Mail\\ContactReplyMail' => 'mail.contact.reply',
+            ],
             'post_install_notes' => [
-                'Wire up a public contact form that writes to `\\App\\Models\\ContactSubmission` (the module only ships the admin inbox).',
-                'Optional: plug in your own `ContactReply` Mailable and uncomment the Mail::to() call in `ContactList@submitReply`.',
+                'Mail goes through your queue: run `php artisan queue:work` unless QUEUE_CONNECTION=sync, and set MAIL_FROM_ADDRESS. The subject list is `contacts.subjects` in config/ui-kit.php.',
                 'The "Copy to Ticket" button auto-appears when the support-tickets module is installed.',
             ],
         ],

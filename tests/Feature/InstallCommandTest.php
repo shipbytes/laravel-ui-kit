@@ -4,6 +4,7 @@ namespace Shipbytes\UiKit\Tests\Feature;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\FortifyServiceProvider;
 use Orchestra\Testbench\Attributes\UsesVendor;
@@ -221,6 +222,15 @@ PHP);
             }
         });
 
+        // The provider looked for the route files at boot, before they were
+        // published; a fresh process would load them. Not routes/auth.php:
+        // Fortify registered its own at boot from its default config, every
+        // feature on, which a fresh process with the patched config would not.
+        foreach (['routes/admin.php', 'routes/ui-kit-user.php'] as $file) {
+            Route::middleware('web')->group(base_path($file));
+        }
+        Route::getRoutes()->refreshNameLookups();
+
         // A freshly-completed install should pass its own health check. This
         // (via the storage-link check) is also the regression net for the
         // trait-static deferred-queue bug: module deferrals must reach the
@@ -229,7 +239,17 @@ PHP);
         $doctor = Artisan::output();
         $this->assertSame(0, $status, $doctor);
 
-        foreach (['fortify features limited to two-factor', 'two-factor columns hidden on the User model', 'sidebar badges resolve'] as $row) {
+        foreach ([
+            'fortify features limited to two-factor',
+            'two-factor columns hidden on the User model',
+            'sidebar badges resolve',
+            'routes/ui-kit-user.php has the public-routes block',
+            'support-tickets routes registered',
+            'support-tickets mail views published',
+            'contacts routes registered',
+            'contacts mail views published',
+            'support ticket policy published',
+        ] as $row) {
             $this->assertMatchesRegularExpression('/'.preg_quote($row, '/').'\s*\|\s*✓ pass/u', $doctor);
         }
     }

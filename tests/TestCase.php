@@ -56,10 +56,13 @@ abstract class TestCase extends Orchestra
 
         foreach ([
             app_path('Livewire'),
+            app_path('Mail'),
+            app_path('Policies'),
             app_path('Models/Concerns'),
             resource_path('views/layouts'),
             resource_path('views/components'),
             resource_path('views/livewire'),
+            resource_path('views/mail'),
         ] as $dir) {
             $fs->deleteDirectory($dir);
         }

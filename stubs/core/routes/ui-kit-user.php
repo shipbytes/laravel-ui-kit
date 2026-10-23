@@ -7,14 +7,22 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| UI Kit user-facing routes
+| UI Kit public and user-facing routes
 |--------------------------------------------------------------------------
 |
-| Authenticated user routes that the kit's modules append to (e.g. /profile).
-| Auto-loaded by UiKitServiceProvider when this file is present in routes/.
-| Modules add lines between the markers below; reorder freely if you want.
+| Pages the kit's modules add outside the admin panel. Auto-loaded by
+| UiKitServiceProvider when this file is present in routes/. Modules add
+| lines between the markers below; rename a path freely (keep the route
+| name, the kit's links use it), or move a line out to routes/web.php.
 */
 
+// Open to guests too (e.g. /contact, /changelog).
+Route::middleware(['web'])->group(function () {
+    /* ui-kit:public-routes-start */
+    /* ui-kit:public-routes-end */
+});
+
+// Signed-in users only (e.g. /profile, /support).
 Route::middleware(['web', 'auth'])->group(function () {
     /* ui-kit:user-routes-start */
     /* ui-kit:user-routes-end */

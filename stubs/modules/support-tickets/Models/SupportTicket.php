@@ -41,6 +41,38 @@ class SupportTicket extends Model
         });
     }
 
+    /**
+     * The categories a user picks from, key => label. The create form, its
+     * validation and the admin filter all read this list.
+     *
+     * @return array<string, string>
+     */
+    public static function categories(): array
+    {
+        return [
+            'general' => 'General',
+            'bug' => 'Bug',
+            'feature_request' => 'Feature Request',
+            'billing' => 'Billing',
+            'other' => 'Other',
+        ];
+    }
+
+    public function categoryLabel(): string
+    {
+        return static::categories()[$this->category] ?? ucfirst(str_replace('_', ' ', (string) $this->category));
+    }
+
+    public static function statusLabelFor(string $status): string
+    {
+        return ucfirst(str_replace('_', ' ', $status));
+    }
+
+    public function statusLabel(): string
+    {
+        return static::statusLabelFor((string) $this->status);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -48,7 +80,8 @@ class SupportTicket extends Model
 
     public function replies(): HasMany
     {
-        return $this->hasMany(TicketReply::class, 'ticket_id')->orderBy('created_at', 'asc');
+        // id breaks a tie: two replies in the same second keep the order they were written.
+        return $this->hasMany(TicketReply::class, 'ticket_id')->orderBy('created_at')->orderBy('id');
     }
 
     public function scopeOpen($query)
@@ -69,6 +102,15 @@ class SupportTicket extends Model
     public function scopeClosed($query)
     {
         return $query->where('status', 'closed');
+    }
+
+    /**
+     * Compared as strings, so an integer key and a driver that hands the
+     * column back as a string still agree, and so do UUID keys.
+     */
+    public function isOwnedBy(?User $user): bool
+    {
+        return $user !== null && (string) $this->user_id === (string) $user->getKey();
     }
 
     public function isOpen(): bool

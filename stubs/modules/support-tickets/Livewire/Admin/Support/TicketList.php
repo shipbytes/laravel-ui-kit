@@ -33,14 +33,7 @@ class TicketList extends Component
         'high' => 'High',
     ];
 
-    public array $categoryOptions = [
-        'all' => 'All Categories',
-        'general' => 'General',
-        'bug' => 'Bug',
-        'feature_request' => 'Feature Request',
-        'billing' => 'Billing',
-        'other' => 'Other',
-    ];
+    public array $categoryOptions = [];
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -48,6 +41,11 @@ class TicketList extends Component
         'priorityFilter' => ['except' => 'all'],
         'categoryFilter' => ['except' => 'all'],
     ];
+
+    public function mount(): void
+    {
+        $this->categoryOptions = ['all' => 'All Categories'] + SupportTicket::categories();
+    }
 
     public function updatedSearch(): void
     {

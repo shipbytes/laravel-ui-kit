@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\Features;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
 use Shipbytes\UiKit\Support\DefaultBadgeResolver;
+use Shipbytes\UiKit\Support\ModuleRegistry;
 
 class DoctorCommand extends Command
 {
@@ -30,12 +31,14 @@ class DoctorCommand extends Command
         $this->failed = false;
 
         $this->checkPublishedFiles();
+        $this->checkPublicRoutesBlock();
         $this->checkLivewire();
         $this->checkFortify();
         $this->checkViteWiring();
         $this->checkDesignSystem();
         $this->checkUserTrait();
         $this->checkModuleRequirements();
+        $this->checkModuleWiring();
         $this->checkDuplicateRouteNames();
         $this->checkTrustedProxies();
         $this->checkMail();
@@ -76,6 +79,7 @@ class DoctorCommand extends Command
             'config/admin.php' => 'php artisan vendor:publish --tag=ui-kit-config',
             'routes/auth.php' => 'php artisan vendor:publish --tag=ui-kit-routes',
             'routes/admin.php' => 'php artisan vendor:publish --tag=ui-kit-routes',
+            'routes/ui-kit-user.php' => 'php artisan vendor:publish --tag=ui-kit-routes',
             'resources/css/ui-kit.css' => 'php artisan vendor:publish --tag=ui-kit-assets',
             'resources/js/ui-kit.js' => 'php artisan vendor:publish --tag=ui-kit-assets',
         ];
@@ -88,7 +92,7 @@ class DoctorCommand extends Command
             }
         }
 
-        foreach (['routes/auth.php', 'routes/admin.php'] as $file) {
+        foreach (['routes/auth.php', 'routes/admin.php', 'routes/ui-kit-user.php'] as $file) {
             $path = base_path($file);
 
             if (! file_exists($path)) {
@@ -101,6 +105,49 @@ class DoctorCommand extends Command
                 $this->skipCheck("{$file} auto-loaded", 'no ui-kit:managed header — load it yourself or re-publish');
             }
         }
+    }
+
+    /**
+     * 0.5 split routes/ui-kit-user.php into a web-only group for pages a guest
+     * opens (/contact, /changelog) above the web + auth one. The installer
+     * never overwrites the file without --force, so an upgraded app keeps the
+     * old single group, and the installer can only warn that it skipped them.
+     */
+    protected function checkPublicRoutesBlock(): void
+    {
+        $check = 'routes/ui-kit-user.php has the public-routes block';
+        $path = base_path('routes/ui-kit-user.php');
+
+        if (! file_exists($path)) {
+            $this->skipCheck($check, 'routes/ui-kit-user.php not published');
+
+            return;
+        }
+
+        $contents = (string) file_get_contents($path);
+
+        if (str_contains($contents, '/* ui-kit:public-routes-start */') && str_contains($contents, '/* ui-kit:public-routes-end */')) {
+            $this->passCheck($check);
+
+            return;
+        }
+
+        $registry = app(ModuleRegistry::class);
+        $needs = array_values(array_filter(
+            (array) config('ui-kit.installed_modules', []),
+            fn ($slug) => is_string($slug) && $registry->has($slug) && ! empty($registry->get($slug)['public_routes'])
+        ));
+
+        $hint = 'the file predates 0.5: re-run php artisan ui-kit:install --force --modules=<the installed ones> (it overwrites every published file, so commit first), '
+            ."or add Route::middleware(['web'])->group(function () { /* ui-kit:public-routes-start */ /* ui-kit:public-routes-end */ }); above the auth group";
+
+        if ($needs === []) {
+            $this->skipCheck($check, 'no installed module adds a public page yet; when one does, '.$hint);
+
+            return;
+        }
+
+        $this->failCheck($check, $hint.' and run php artisan ui-kit:install-module '.implode(' ', $needs));
     }
 
     /**
@@ -509,6 +556,77 @@ class DoctorCommand extends Command
     }
 
     /**
+     * What the registry says each installed module put in place: its routes,
+     * under the names the kit's links use, and the mailables it sends with
+     * their markdown views. A route line that never made it into its marker
+     * block (a routes file from an older version, a line deleted by hand)
+     * leaves a nav entry or a header link pointing at nothing, and a missing
+     * mail view only fails inside a queue worker, where nobody is looking.
+     */
+    protected function checkModuleWiring(): void
+    {
+        $registry = app(ModuleRegistry::class);
+        $adminPrefix = (string) config('admin.route_name_prefix', 'admin.');
+
+        foreach ((array) config('ui-kit.installed_modules', []) as $slug) {
+            if (! is_string($slug) || ! $registry->has($slug)) {
+                continue;
+            }
+
+            $meta = $registry->get($slug);
+            $names = [];
+
+            foreach (['admin_routes' => $adminPrefix, 'user_routes' => '', 'public_routes' => ''] as $key => $prefix) {
+                foreach ((array) ($meta[$key] ?? []) as $line) {
+                    if (preg_match("/->name\\(\\s*'([^']+)'\\s*\\)/", (string) $line, $m)) {
+                        $names[] = $prefix.$m[1];
+                    }
+                }
+            }
+
+            if ($names !== []) {
+                $missing = array_values(array_filter($names, fn (string $name) => ! Route::has($name)));
+
+                if ($missing === []) {
+                    $this->passCheck("{$slug} routes registered");
+                } else {
+                    $this->failCheck("{$slug} routes registered", 'missing: '.implode(', ', $missing).". Re-run php artisan ui-kit:install-module {$slug}: it adds the module's lines between the ui-kit markers in routes/admin.php and routes/ui-kit-user.php (a renamed path is fine; keep the route name)");
+                }
+            }
+
+            $mail = (array) ($meta['mail'] ?? []);
+
+            if ($mail !== []) {
+                $missing = [];
+
+                foreach ($mail as $class => $view) {
+                    if (! class_exists($class)) {
+                        $missing[] = $class;
+                    }
+
+                    if (! view()->exists($view)) {
+                        $missing[] = 'resources/views/'.str_replace('.', '/', $view).'.blade.php';
+                    }
+                }
+
+                if ($missing === []) {
+                    $this->passCheck("{$slug} mail views published");
+                } else {
+                    $this->failCheck("{$slug} mail views published", 'missing: '.implode(', ', $missing).". Re-run php artisan ui-kit:install-module {$slug} (it copies the module's app/Mail and resources/views/mail files, overwriting its other published files too, so commit first)");
+                }
+            }
+        }
+
+        if (in_array('support-tickets', (array) config('ui-kit.installed_modules', []), true)) {
+            if (class_exists('App\\Policies\\SupportTicketPolicy')) {
+                $this->passCheck('support ticket policy published');
+            } else {
+                $this->failCheck('support ticket policy published', 'app/Policies/SupportTicketPolicy.php is missing, so every ticket page answers 403: re-run php artisan ui-kit:install-module support-tickets');
+            }
+        }
+    }
+
+    /**
      * Asks the model rather than reading the file, so a $hidden property, a
      * #[Hidden] attribute and a $visible allow-list all count.
      */
@@ -588,7 +706,7 @@ class DoctorCommand extends Command
         if ($from !== '' && $from !== 'hello@example.com') {
             $this->passCheck('mail from address configured');
         } else {
-            $this->skipCheck('mail from address configured', 'set MAIL_FROM_ADDRESS in .env — password reset / verification mails need it');
+            $this->skipCheck('mail from address configured', 'set MAIL_FROM_ADDRESS in .env — password reset, verification and the support and contact mail need it');
         }
     }
 }

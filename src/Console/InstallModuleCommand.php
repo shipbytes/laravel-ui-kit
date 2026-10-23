@@ -144,6 +144,10 @@ class InstallModuleCommand extends Command
             $this->patchUserRoutes($meta['user_routes']);
         }
 
+        if (! empty($meta['public_routes'])) {
+            $this->patchPublicRoutes($meta['public_routes']);
+        }
+
         if (! empty($meta['artisan_publish'])) {
             foreach ($meta['artisan_publish'] as $args) {
                 $this->deferVendorPublish($args);

@@ -211,6 +211,28 @@ for (const theme of ['light', 'dark']) {
   await open(page, route('impersonate.leave'))
   await ctx.close()
 
+  // a signed-in user's side of support
+  ctx = await context(theme)
+  page = await ctx.newPage()
+  await login(page, 'linus@example.com')
+  await open(page, '/support')
+  await shot(page, 'support-list', theme)
+  await open(page, '/support/create')
+  await shot(page, 'support-create', theme)
+  await open(page, '/support')
+  await open(page, new URL(await page.getAttribute('a[href*="/support/"]:not([href$="/create"])', 'href'), BASE).pathname)
+  await shot(page, 'support-ticket', theme)
+  await ctx.close()
+
+  // the public pages, as a guest sees them
+  ctx = await context(theme)
+  page = await ctx.newPage()
+  for (const [name, path] of [['contact', '/contact'], ['changelog', '/changelog']]) {
+    await open(page, path)
+    await shot(page, name, theme)
+  }
+  await ctx.close()
+
   // the admin shell on a phone
   ctx = await context(theme, { width: 390, height: 844 })
   page = await ctx.newPage()

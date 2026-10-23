@@ -13,7 +13,7 @@ Core + 7 optional modules, installed by a turnkey `php artisan ui-kit:install`. 
 - **Auth pages** — login, register, forgot/reset password, email verification, confirm password, and a **two-factor challenge** page (Livewire 4 single-file components + Fortify), light and dark
 - **Working 2FA** — the login flow stages a TOTP/recovery-code challenge for users who enabled two-factor auth (enable/confirm UI ships with the `profile` module)
 - **Admin shell** — collapsible sidebar, mobile bottom nav with a "More" sheet, theme toggle, current-user footer with profile link + logout; nav is config-driven from `config/admin.php` with Heroicons v2 icon names
-- **User shell** — a light authenticated layout (`layouts/user-shell`) used by user-facing pages like `/profile`
+- **User shell** — a light layout (`layouts/user-shell`) for the pages outside the admin panel (`/profile`, `/support`, `/contact`, `/changelog`). Signed in, its header shows Admin (for admins), the avatar and Log out; signed out, Sign in and Register. Support and Changelog links appear once their modules are installed
 - **Dashboard stub + Users list/detail** — stat tiles, a searchable table with avatars and an Admin badge, a detail page with a guarded Delete user button, and the `<x-ui-kit::page-header>` component every admin screen opens with
 - **Built on the Shipbytes design system** — every view uses [`shipbytes/blade-ui`](https://shipbytes.dev/docs/design-system) (`ds::` Blade components, semantic tokens that switch for dark mode on their own, Heroicons v2, Inter); it comes with the kit, so there's no separate install step
 - **`WithDesignSystemPagination`** — a Livewire trait that pages any list with the design system's pagination, keeping its search and filters
@@ -25,9 +25,9 @@ Core + 7 optional modules, installed by a turnkey `php artisan ui-kit:install`. 
 | Slug | What it adds | Composer deps |
 |---|---|---|
 | `admin-middleware` | Spatie Permissions wiring (falls back to `is_admin` boolean if skipped) | `spatie/laravel-permission:^6.10` |
-| `support-tickets` | Admin ticket queue + replies (Mailables left to you) | — |
-| `changelog` | Admin-authored changelog with public feed helper | `mews/purifier:^3.4` |
-| `contacts` | Contact-form submission inbox | — |
+| `support-tickets` | Users open and follow tickets at `/support`; admins answer from a queue; mail both ways | — |
+| `changelog` | Admin-authored changelog, published at `/changelog` with a category filter | `mews/purifier:^3.4` |
+| `contacts` | Public contact form at `/contact` and the admin inbox it fills, replies sent by mail | — |
 | `profile` | Self-service name/email/password/avatar + full 2FA management | — (optional: `intervention/image`) |
 | `impersonation` | Login-as-user with exit ribbon + button partial | `lab404/laravel-impersonate:^1.7.5` |
 | `activity-log` | Spatie activity log + filterable admin viewer | `spatie/laravel-activitylog:^4.10` |
@@ -137,7 +137,7 @@ composer update shipbytes/laravel-ui-kit
 
 - Publishes every kit + dependency config, view, class, route file, and migration
 - Patches `config/fortify.php` (`views=false`, `home=/`, and turns off the features whose endpoints the kit's own pages replace: registration, password reset, profile and password updates, passkeys) and publishes Fortify's 2FA columns migration
-- Patches `config/admin.php` nav and `routes/admin.php` / `routes/ui-kit-user.php` between `/* ui-kit:* */` markers — **idempotently**, and without wiping other modules' entries
+- Patches `config/admin.php` nav, `routes/admin.php` and both groups of `routes/ui-kit-user.php` (one open to guests, one for signed-in users) between `/* ui-kit:* */` markers — **idempotently**, and without wiping other modules' entries
 - **Wires your Vite entrypoints**: adds `@import './ui-kit.css';` to `resources/css/app.css` and `import './ui-kit';` to `resources/js/app.js`, and deletes the skeleton's Instrument Sans `--font-sans` from `app.css` (see [Finish wiring](#finish-wiring-the-irreducible-checklist))
 - Runs `vendor:publish` for every dependent package, one `php artisan migrate`, seeds the admin role, runs `storage:link`
 - Generates `app/Models/Concerns/UiKitUser.php` bundling exactly the traits your chosen modules need (Spatie `HasRoles`, lab404 `Impersonate`, Fortify `TwoFactorAuthenticatable` plus `avatarUrl()`) — **and applies it to `app/Models/User.php` automatically** (the patch is lint-checked and reverted if it would break the file; you only edit by hand if the installer says so)
@@ -171,8 +171,8 @@ composer update shipbytes/laravel-ui-kit
    (package installed, `ui-kit.css` imports it and scans the kit's views, no
    leftover 0.3 theme file, no font override in `app.css`, nav icons resolve,
    admin lists use the design system's pagination), trait applied, storage
-   link, 2FA columns, duplicate route names and mail config. Every failing row
-   says how to fix it.
+   link, 2FA columns, each module's routes and mail views, duplicate route
+   names and mail config. Every failing row says how to fix it.
 
 > The `UiKitUser` trait used to be a manual step here — the installer now
 > applies it to `app/Models/User.php` itself and only asks you to do it by
@@ -347,6 +347,83 @@ Secrets are read with `Fortify::currentEncrypter()`, so `Fortify::encryptUsing()
 
 Without the `profile` module (or without the trait applied), login simply never challenges — nothing breaks.
 
+## Mail
+
+The `support-tickets` and `contacts` modules send mail. Each mailable is a published
+stub in `app/Mail/` with a markdown view in `resources/views/mail/`, so change the
+wording, the subject or the recipients there.
+
+| Mailable | Sent when | To |
+|---|---|---|
+| `NewTicketMail` | a user opens a ticket | the admins (replying writes to the user) |
+| `TicketReplyMail` | a user replies, or an admin does | the admins, or the ticket's owner; the link opens the admin page or the user's own |
+| `TicketStatusChangedMail` | an admin changes a ticket's status | the ticket's owner, with the old and new status |
+| `ContactSubmittedMail` | someone sends the contact form | the admins (replying writes to the sender) |
+| `ContactConfirmationMail` | the same | the sender, with a copy of the message |
+| `ContactReplyMail` | an admin replies from the inbox | the sender: the reply, then their message quoted |
+
+**The admins** are `\Shipbytes\UiKit\Support\UiKit::admins()`: users with the Spatie
+`admin` role when `admin-middleware` is installed, else users with `is_admin`. To send
+admin mail to a shared mailbox instead, list addresses in `.env`:
+
+```dotenv
+UI_KIT_ADMIN_ADDRESSES="support@example.com,ops@example.com"
+```
+
+(or set `mail.admin_addresses` in `config/ui-kit.php`; a non-empty list replaces the
+admin users).
+
+**Queued.** The mailables implement `ShouldQueue` on the default queue. With
+`QUEUE_CONNECTION=sync` they go out during the request; with the Laravel 12 skeleton's
+`database` default, run `php artisan queue:work` or nothing is sent.
+
+**A failure never loses the row.** The ticket, reply or message is saved before the mail
+is attempted, and a send that throws is logged as `ui-kit: could not send App\Mail\…`
+with the error; the form still succeeds. The admin screens say so: "Reply saved, but the
+email failed: …". On a real queue a failure happens in the worker instead and lands in
+`failed_jobs`.
+
+**Set `MAIL_FROM_ADDRESS`.** The doctor's `mail from address configured` row warns while
+it is unset or still `hello@example.com`.
+
+**The look** is Laravel's stock markdown theme, with your `APP_NAME` in the header and no
+kit branding. To restyle it, `php artisan vendor:publish --tag=laravel-mail` and edit
+`resources/views/vendor/mail/html/themes/default.css`, or add a theme of your own and
+name it in `config/mail.php` under `markdown.theme`.
+
+The doctor's `support-tickets mail views published` and `contacts mail views published`
+rows check every mailable class and view is in place.
+
+### Public forms of your own
+
+The contact form and the new-ticket form share two guards: a honeypot field and an hourly
+limit counted only after validation passes. Use them on a form of yours:
+
+```php
+use Shipbytes\UiKit\Livewire\Concerns\WithSpamProtection;
+
+public function submit(): void
+{
+    if ($this->caughtInHoneypot()) {            // a bot filled the hidden field
+        $this->sent = true;                     // fake success, save nothing
+        return;
+    }
+
+    $this->validate();
+
+    if (! $this->passesRateLimit('quote:'.request()->ip(), 3)) {   // 3 an hour
+        return;                                 // the refusal is in the `limit` error
+    }
+
+    // save, then UiKit::sendMail(UiKit::admins(), new QuoteRequestedMail($quote));
+}
+```
+
+```blade
+@error('limit') <x-ds::alert tone="danger">{{ $message }}</x-ds::alert> @enderror
+<x-ui-kit::honeypot />
+```
+
 ## Installing modules later
 
 ```bash
@@ -367,13 +444,21 @@ Re-running `ui-kit:install` is safe: it detects the existing install, keeps your
 Ships `EnsureUserIsAdmin` (Spatie role check) + `AdminRoleSeeder`. The installer publishes Spatie's config/migrations, migrates, seeds the `admin`/`user` roles, and swaps the middleware in `config/admin.php` from the `is_admin` fallback to the role check. The `UiKitUser` trait (with `HasRoles`) is applied to your User model automatically; grant the role with `php artisan ui-kit:make-admin you@example.com`.
 
 ### `support-tickets`
-Admin-only queue (the public form is yours to build). The Support nav entry shows the open-ticket count on its own (see [Sidebar badges](#sidebar-badges)). The list opens with four stat tiles (total, open, in progress, resolved), then a search field and status/priority/category filters over a table (Subject, From, Status, Priority, Category, Updated) with badge tones from `SupportTicket::statusTone()` / `priorityTone()`, and Livewire pagination. A ticket shows the thread, an inline reply, and Status and Priority selects in one labelled panel, validated server-side. Mailables are intentionally omitted so you plug in your own notification flow.
+Both halves of a help desk. **Users** (signed in) get `/support`: their own tickets with a status filter, status and priority badges and 15 to a page; `/support/create`: subject, a category from `SupportTicket::categories()` and a message of 20 to 5,000 characters; and `/support/{ulid}`: the conversation, a reply box, and Close / Reopen. A closed or resolved ticket takes no replies until it is reopened. Access goes through the published `App\Policies\SupportTicketPolicy` (Laravel finds it by name): the owner or an admin may view and update a ticket, only an admin may delete one. Limits: five new tickets an hour per user, ten replies an hour per ticket, counted only after validation passes; the create form has a honeypot.
+
+**Admins** keep the queue at `/admin/support`: four stat tiles (total, open, in progress, resolved), a search field and status/priority/category filters over a table with badge tones from `SupportTicket::statusTone()` / `priorityTone()`. A ticket shows the thread, an inline reply, and Status and Priority selects. The Support nav entry shows the open count (see [Sidebar badges](#sidebar-badges)).
+
+**Mail** both ways (see [Mail](#mail)): a new ticket and each user reply go to the admins; an admin reply and a status change go to the owner.
 
 ### `changelog`
-Admin CRUD + `ChangelogEntry::published()` scope for a public feed. The list is a table with a title search, a category filter, category badges (`ChangelogEntry::categoryTone()`) and Published/Draft badges; the form's Published toggle is a `ds::switch` saved with the rest of the form. HTML is sanitized via `mews/purifier`. For a public page, add a route rendering your own view over the `published()` scope (the module ships only the admin side).
+Admin CRUD at `/admin/changelog`: a table with a title search, a category filter, category badges (`ChangelogEntry::categoryTone()`) and Published/Draft badges; the form's Published toggle is a `ds::switch`. Bodies are sanitized with `mews/purifier` on save.
+
+**Public** at `/changelog`, for guests and users alike: published entries (`ChangelogEntry::published()`: published and dated today or earlier), newest first, grouped by month, each with its category badge. The category filter is a row of links (`ds::tabs` in navigation mode) carrying per-category counts from one query, and lives in the query string (`/changelog?category=fix`), so a filtered view can be shared. Categories are `ChangelogEntry::categories()`.
 
 ### `contacts`
-Inbox for a public contact form that writes to `contact_submissions`. Stat tiles (total, unread, replied, archived), a search field and a status filter over a table with a select column; selecting rows shows a bulk bar (Mark read, Mark unread, Archive, Delete). A message opens in a `ds::modal` with its reply draft (bring your own Mailable). Archiving sets `archived_at`; archived messages leave the inbox and show under the Archived filter. When `support-tickets` is also installed, a **Copy to Ticket** button appears automatically. The Contacts nav entry shows the unread count (unread and not archived) on its own.
+**Public** at `/contact`, for guests and users (a signed-in user's name and email are filled in): name, email, a subject from `contacts.subjects` in `config/ui-kit.php` (five neutral labels, edit them freely) and a message of 10 to 5,000 characters. A honeypot fakes success for bots, and each address may send three an hour (counted after validation). The message is saved with the sender's IP, the admins get a `ContactSubmittedMail` and the sender a `ContactConfirmationMail`, and the form gives way to a thank-you with a **Send another** button.
+
+**Admins** read the inbox at `/admin/contacts`: stat tiles (total, unread, replied, archived), a search field and a status filter over a table with a select column; selecting rows shows a bulk bar (Mark read, Mark unread, Archive, Delete). A message opens in a `ds::modal`; its reply is saved and sent as a `ContactReplyMail` ("Re: …", the reply above the quoted message), and the inbox says "Reply sent to …" or, when the mail fails, "Reply saved, but the email failed: …". Archiving sets `archived_at`; archived messages show under the Archived filter. With `support-tickets` installed, a **Copy to Ticket** button appears. The Contacts nav entry shows the unread count.
 
 ### `profile`
 Cards under `/profile` (rendered in the user shell, not the admin shell): update info + avatar, update password, two-factor authentication, delete account. The avatar is a round `ds::avatar` (initials until a photo exists) beside a `ds::file-upload` drop zone with Save photo, Cancel and Remove; deleting the account confirms the password in a `ds::modal`. Avatars are stored on the public disk under a random 40-character name with a content-derived extension, resized to 200×200 when `intervention/image` is installed; replacing a photo deletes the old file, and deleting the account deletes the photo. The profile stores `avatar_path` with `forceFill()`, so a stock `User` model's `$fillable` doesn't need changing. The generated trait's `avatarUrl()` puts the photo in the admin rail, the user list and detail, and the user shell. Re-sending the verification email is limited to six a minute per user.
@@ -384,6 +469,10 @@ Two Blade partials over `lab404/laravel-impersonate`. The package ships its rout
 ### `activity-log`
 Paginated admin viewer over `spatie/laravel-activitylog`: a table of when, who, event (with the log name as a small badge under it), subject and description, filtered by labelled log stream, user email and date range fields. Add the `LogsActivity` trait to models you want logged (see Spatie's docs).
 
+### Public and user routes
+
+The module pages live in `routes/ui-kit-user.php`, in two groups: `/contact` and `/changelog` in the web-only group (guests too), `/profile` and `/support/*` in the web + auth group. Rename a path there if it clashes with one of yours; keep the route name (`contact`, `changelog.public`, `support.index`…), which the kit's links use. The doctor's `no duplicate route names` row catches a name that collides.
+
 ## Environment reference
 
 ```dotenv
@@ -392,7 +481,7 @@ UI_KIT_BRAND_NAME="Acme"
 UI_KIT_BRAND_LOGO="/images/logo.png"
 UI_KIT_HOME_ROUTE="home"
 
-# --- Mail (required for password reset, email verification) --------------
+# --- Mail (password reset, verification, tickets, the contact form) -------
 MAIL_MAILER=smtp
 MAIL_HOST=smtp.mailgun.org
 MAIL_PORT=587
@@ -401,6 +490,8 @@ MAIL_PASSWORD=your-smtp-password
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS="noreply@example.com"
 MAIL_FROM_NAME="${APP_NAME}"
+UI_KIT_ADMIN_ADDRESSES=""             # optional: admin mail to these instead of the admin users
+QUEUE_CONNECTION=sync                 # or keep 'database' and run php artisan queue:work
 ```
 
 In local dev, `MAIL_MAILER=log` works — mail lands in `storage/logs/laravel.log`.

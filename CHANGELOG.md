@@ -10,6 +10,137 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+The user-facing halves of three modules. Until now `support-tickets`, `contacts`
+and `changelog` shipped only their admin screens: the ticket queue had no way for
+a user to open a ticket, the inbox's reply was saved and never sent, and the
+changelog had no reader. Each now has its public or signed-in pages, the mail
+that connects the two sides, and doctor rows for what the installer promises.
+New routes make it a minor release: "Upgrading from 0.4" at the end has the steps.
+
+### Breaking
+
+- **Five new routes.** `support-tickets` adds `/support`, `/support/create` and
+  `/support/{ulid}` for signed-in users (`support.index`, `support.create`,
+  `support.show`); `contacts` adds `/contact` (`contact`) and `changelog` adds
+  `/changelog` (`changelog.public`), both open to guests. An app that already
+  has a route at one of those paths ends up with two, and only one answers:
+  rename the kit's path in `routes/ui-kit-user.php` and keep its route name,
+  which the kit's links use. A colliding route *name* fails the doctor's
+  `no duplicate route names` row, and `route:cache`.
+- **`routes/ui-kit-user.php` has a second group.** A `Route::middleware(['web'])`
+  group between `/* ui-kit:public-routes-start */` and `/* ui-kit:public-routes-end */`
+  markers sits above the web + auth one, and modules patch it through the new
+  `public_routes` registry key. The installer never overwrites the file without
+  `--force`, so an upgraded app keeps its 0.4 copy: the installer then warns that
+  it skipped `/contact` and `/changelog`, and the doctor's
+  `routes/ui-kit-user.php has the public-routes block` row fails with the fix.
+- **Support and contacts send mail.** A ticket, a reply, a status change and a
+  contact message now each mail someone (see Added). If you wired mail of your
+  own after the 0.4 post-install notes, remove it or each one goes out twice.
+
+### Added
+
+- **Support tickets for users.** `/support` lists the signed-in user's own
+  tickets with a status filter (kept in the query string), status and priority
+  badges from the model's tone methods and 15 to a page, and an empty state with
+  a New ticket button. `/support/create` takes a subject (up to 255), a category
+  from the new `SupportTicket::categories()` and a message of 20 to 5,000
+  characters, then opens the ticket (priority medium, status open, the IP saved)
+  with that message as its first reply and goes to it. `/support/{ulid}` shows
+  the thread with a reply box (2 to 5,000 characters, refused while the ticket is
+  closed or resolved) and Close / Reopen. Limits: five tickets an hour per user,
+  ten replies an hour per ticket. The pages render in the user shell.
+- **`App\Policies\SupportTicketPolicy`**, published and found by Laravel by
+  name: the owner or an admin may view and update a ticket, only an admin may
+  delete one.
+- **Mail, as published stubs.** Six mailables in `app/Mail/` with markdown views
+  in `resources/views/mail/`, on Laravel's stock markdown theme with no kit
+  branding: `NewTicketMail` (to the admins, reply-to the user, linking the admin
+  page), `TicketReplyMail` (both directions; `toAdmin` picks the readers and the
+  link), `TicketStatusChangedMail` (to the owner, old to new),
+  `ContactSubmittedMail` (to the admins, reply-to the sender),
+  `ContactConfirmationMail` (to the sender, with a copy) and `ContactReplyMail`
+  ("Re: …", the reply above the quoted message). They implement `ShouldQueue` on
+  the default queue, so `QUEUE_CONNECTION=sync` sends them during the request.
+  Every send happens after the row is saved, inside a try/catch that logs
+  `ui-kit: could not send <class>`, so a mail that fails never fails the form.
+- **A public contact form** at `/contact`: name, email, a subject from
+  `ui-kit.contacts.subjects` (five neutral labels in the published config), and a
+  message of 10 to 5,000 characters; a signed-in user's name and email are filled
+  in. Three messages an hour per IP. It saves the message with the sender's IP,
+  mails the admins and the sender, and shows a thank-you with a Send another
+  button.
+- **A public changelog** at `/changelog`: published entries, newest first, grouped
+  by month, each with its category badge and its body. The category filter is a
+  row of links (`ds::tabs` in navigation mode) with per-category counts from one
+  query, kept in the query string. `ChangelogEntry::categories()` lists the
+  categories.
+- **The user shell works signed out.** Guests see Sign in, and Register when the
+  route exists, in place of the avatar and Log out. Support (signed in) and
+  Changelog links appear when their routes exist, the way Profile does, marked
+  `aria-current` on their own pages, and wrap onto a second row on a phone.
+- **`UiKit::admins()`**: who gets admin mail. The Spatie `admin` role when the
+  User model has `hasRole()`, else `is_admin`; `ui-kit.mail.admin_addresses`
+  (`UI_KIT_ADMIN_ADDRESSES`, comma-separated) replaces that list when set.
+- **`UiKit::sendMail($recipients, $mailable)`**: one message per recipient, never
+  throws, returns the first failure for the screen to report.
+- **`WithSpamProtection` and `<x-ui-kit::honeypot />`**, shared by the contact
+  and new-ticket forms and usable on forms of your own: a honeypot field
+  (`website`, visually hidden, `tabindex="-1"`, `autocomplete="off"`) that fakes
+  success without saving, and `passesRateLimit()`, which counts an attempt only
+  after validation has passed.
+- **Registry keys** `public_routes` (patched like `user_routes`, idempotent by
+  route name, re-applied in update mode) and `mail` (mailable => view).
+- **Doctor rows:** `routes/ui-kit-user.php published` and its auto-load row,
+  `routes/ui-kit-user.php has the public-routes block` (fails only once an
+  installed module needs it), `<module> routes registered` for every installed
+  module's admin, user and public routes, `<module> mail views published` for
+  `support-tickets` and `contacts`, and `support ticket policy published`.
+- The fresh-app CI job smoke-tests `/contact`, `/changelog` and the guest
+  redirect from `/support`.
+
+### Changed
+
+- **The admin ticket screen mails the owner.** A reply sends `TicketReplyMail`
+  linking the user's own ticket page and says "Reply sent to …"; a status change
+  sends `TicketStatusChangedMail`. When the mail fails, the screen says the reply
+  or the status was saved and the email was not.
+- **The inbox reply is sent.** `ContactList@submitReply` sends `ContactReplyMail`
+  and says "Reply sent to …", or "Reply saved, but the email failed: …".
+- The admin ticket list's category filter reads `SupportTicket::categories()`.
+- The installer copies a module's `Mail/` and `Policies/` stubs into `app/`.
+- Post-install notes: the changelog's "optional public feed", the contacts
+  module's "wire up a public contact form" and "plug in your own ContactReply",
+  and support-tickets' "ships without Mailables" are gone; both mailing modules
+  note the queue worker and `MAIL_FROM_ADDRESS` instead. Module summaries in
+  `ui-kit:list-modules` describe both halves.
+
+### Fixed
+
+- **A ticket's conversation keeps its order.** `SupportTicket::replies()` sorted
+  by `created_at` alone, so two messages written in the same second could show in
+  either order, on the admin page too. The id now breaks the tie.
+
+### Upgrading from 0.4
+
+1. `composer require shipbytes/laravel-ui-kit:^0.5`.
+2. Commit first, then re-run the installer in update mode with every installed
+   module: `php artisan ui-kit:install --force --modules=…` (the names
+   `ui-kit:list-modules` shows). It republishes `routes/ui-kit-user.php` with the
+   public-routes block and patches the modules' lines back in, and publishes the
+   new components, mailables, views and policy. As before, `--force` overwrites
+   `config/admin.php` and `config/ui-kit.php`, so read `git diff` and restore
+   your own nav entries and values. (Without `--force`, add
+   `Route::middleware(['web'])->group(function () { /* ui-kit:public-routes-start */ /* ui-kit:public-routes-end */ });`
+   above the auth group in `routes/ui-kit-user.php` yourself and run
+   `php artisan ui-kit:install-module support-tickets contacts changelog`, which
+   re-copies those modules' files.)
+3. `npm run build`.
+4. Set `MAIL_FROM_ADDRESS` in `.env`, and run `php artisan queue:work` unless
+   `QUEUE_CONNECTION=sync`. Optionally set `UI_KIT_ADMIN_ADDRESSES` to send
+   admin mail to a shared mailbox.
+5. `php artisan ui-kit:doctor`. Every row should pass, or skip with a reason.
+
 ## [0.4.1] - 2026-10-23
 
 A hardening release: no breaking changes. The installer closes five Fortify
