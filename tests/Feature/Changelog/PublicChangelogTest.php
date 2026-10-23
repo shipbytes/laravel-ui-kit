@@ -52,6 +52,19 @@ class PublicChangelogTest extends InstalledKitTestCase
             ->assertDontSee('Next week');
     }
 
+    public function test_an_entry_dated_today_is_published_today(): void
+    {
+        // Saved through the model, the way the admin form saves it.
+        $this->entry('Out this morning', 'feature', '2026-10-20');
+        $this->entry('Out tomorrow', 'feature', '2026-10-21');
+
+        $this->get('/changelog')
+            ->assertSee('Out this morning')
+            ->assertDontSee('Out tomorrow');
+
+        $this->assertSame(['Out this morning'], ChangelogEntry::published()->pluck('title')->all());
+    }
+
     public function test_the_category_filter_lives_in_the_query_string_with_counts(): void
     {
         $this->entry('Scheduled exports', 'feature', '2026-10-14');

@@ -10,6 +10,18 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Fixed
+
+- **A changelog entry dated today now shows on `/changelog` on SQLite.**
+  `ChangelogEntry::published()` compared `published_at` with today's date as
+  strings, and the date cast stores `2026-10-23 00:00:00`, which SQLite (Laravel
+  12's default database) ranks after `2026-10-23`. Every entry dated today stayed
+  hidden until the next day; MySQL and PostgreSQL were not affected. The scope
+  now uses `whereDate`. An app on 0.5.0 picks it up by republishing the model
+  (`php artisan ui-kit:install-module changelog`, which overwrites the module's
+  published files, so commit first) or by changing `where('published_at', …)` to
+  `whereDate('published_at', …)` in `app/Models/ChangelogEntry.php`.
+
 ## [0.5.0] - 2026-10-23
 
 The user-facing halves of three modules. Until now `support-tickets`, `contacts`
