@@ -19,6 +19,7 @@ use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
  *
  * Two accounts matter to the harness: admin@example.com (admin, no 2FA) and
  * grace@example.com (2FA enabled and confirmed). Both use the password "password".
+ * margaret@example.com is an admin too, only so the user list shows the badge.
  */
 class ScreenshotSeeder extends Seeder
 {
@@ -60,6 +61,9 @@ class ScreenshotSeeder extends Seeder
             'email_verified_at' => $i % 4 === 3 ? null : now()->subDays($i * 9 + 2),
             'created_at' => now()->subDays($i * 9 + 2),
         ]));
+
+        // A second admin near the top of the user list, so its Admin badge is in the shot.
+        Artisan::call('ui-kit:make-admin', ['email' => 'margaret@example.com']);
 
         $tickets = [
             ['Cannot export the monthly report as CSV', 'bug', 'high', 'open'],

@@ -31,6 +31,14 @@ class ContactSubmission extends Model
         return $query->whereNull('archived_at');
     }
 
+    /**
+     * What the sidebar badge counts: unread and still in the inbox.
+     */
+    public function scopeUnread($query)
+    {
+        return $query->whereNull('archived_at')->where('status', 'unread');
+    }
+
     public function scopeArchived($query)
     {
         return $query->whereNotNull('archived_at');

@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
+use Laravel\Fortify\Fortify;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Shipbytes\UiKit\Support\UiKit;
@@ -16,6 +17,15 @@ new #[Layout('layouts.guest')] class extends Component
 
     public function mount(): void
     {
+        // A login staged by Fortify's own POST /login rather than the kit's
+        // form: adopt it, so the challenge completes instead of bouncing.
+        if (! session()->has('ui-kit.login.id') && session()->has('login.id')) {
+            session()->put([
+                'ui-kit.login.id' => session()->pull('login.id'),
+                'ui-kit.login.remember' => (bool) session()->pull('login.remember', false),
+            ]);
+        }
+
         if (! session()->has('ui-kit.login.id')) {
             $this->redirectRoute('login', navigate: true);
         }
@@ -36,7 +46,7 @@ new #[Layout('layouts.guest')] class extends Component
 
         if ($this->code !== '') {
             $valid = app(TwoFactorAuthenticationProvider::class)->verify(
-                decrypt($user->two_factor_secret),
+                $this->decrypt($user->two_factor_secret),
                 $this->code
             );
 
@@ -48,7 +58,7 @@ new #[Layout('layouts.guest')] class extends Component
                 ]);
             }
         } elseif ($this->recovery_code !== '') {
-            $codes = json_decode(decrypt($user->two_factor_recovery_codes), true) ?: [];
+            $codes = json_decode($this->decrypt($user->two_factor_recovery_codes), true) ?: [];
 
             if (! in_array($this->recovery_code, $codes, true)) {
                 RateLimiter::hit($this->throttleKey());
@@ -73,6 +83,17 @@ new #[Layout('layouts.guest')] class extends Component
         Session::regenerate();
 
         $this->redirectIntended(default: UiKit::homeUrl(), navigate: true);
+    }
+
+    /**
+     * Fortify encrypts the two-factor columns with its own encrypter when the
+     * app sets one (Fortify::encryptUsing), so read them back the same way.
+     */
+    protected function decrypt(string $value): string
+    {
+        return method_exists(Fortify::class, 'currentEncrypter')
+            ? Fortify::currentEncrypter()->decrypt($value)
+            : decrypt($value);
     }
 
     protected function ensureIsNotRateLimited(): void

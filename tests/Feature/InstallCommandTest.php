@@ -3,9 +3,11 @@
 namespace Shipbytes\UiKit\Tests\Feature;
 
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\FortifyServiceProvider;
 use Orchestra\Testbench\Attributes\UsesVendor;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use Shipbytes\UiKit\Tests\Fixtures\MakeAdminUser;
 use Shipbytes\UiKit\Tests\TestCase;
 
@@ -68,7 +70,12 @@ PHP);
 
     // UsesVendor: the closing doctor run checks the design system at
     // base_path('vendor/…'), as it is in a real app.
+    //
+    // Its own process: the doctor's hidden-columns row loads App\Models\User,
+    // and a class another test already loaded from a different file would
+    // answer for this one.
     #[UsesVendor]
+    #[RunInSeparateProcess]
     public function test_full_install_publishes_patches_and_records_state(): void
     {
         // The skeleton's database/migrations dir has no users migration —
@@ -90,6 +97,15 @@ PHP);
         $fortify = file_get_contents(config_path('fortify.php'));
         $this->assertStringContainsString("'views' => false", $fortify);
         $this->assertStringContainsString("'home' => '/'", $fortify);
+
+        // …and every feature whose endpoints the kit does not own is off,
+        // the multi-line passkeys call included, leaving valid PHP.
+        foreach (['registration', 'resetPasswords', 'updateProfileInformation', 'updatePasswords', 'passkeys'] as $feature) {
+            $this->assertDoesNotMatchRegularExpression('/^\s*Features::'.$feature.'\(/m', $fortify, "{$feature} is still on");
+        }
+        $this->assertMatchesRegularExpression('/^\s*Features::twoFactorAuthentication\(/m', $fortify);
+        exec(PHP_BINARY.' -l '.escapeshellarg(config_path('fortify.php')).' 2>&1', $fortifyLint, $fortifyLintCode);
+        $this->assertSame(0, $fortifyLintCode, implode("\n", $fortifyLint));
 
         // installed_modules recorded between markers WITHOUT nuking env() calls.
         $uiKit = file_get_contents(config_path('ui-kit.php'));
@@ -150,6 +166,9 @@ PHP);
         exec(PHP_BINARY.' -l '.escapeshellarg(app_path('Models/User.php')).' 2>&1', $lintOut, $lintCode);
         $this->assertSame(0, $lintCode, implode("\n", $lintOut));
 
+        // A model with no $hidden at all gets one holding the 2FA columns.
+        $this->assertStringContainsString("protected \$hidden = ['two_factor_secret', 'two_factor_recovery_codes'];", $userModel);
+
         // ---- Re-run: must succeed non-interactively (update mode) and stay idempotent.
         $this->artisan('ui-kit:install', ['--modules' => self::MODULES, '--no-interaction' => true])
             ->assertSuccessful();
@@ -184,11 +203,35 @@ PHP);
             "Fortify's unguarded 2FA migration must not be re-published on re-runs"
         );
 
+        $this->assertSame(1, substr_count(file_get_contents(app_path('Models/User.php')), 'two_factor_secret'), 're-running must not hide the columns twice');
+        $this->assertSame($fortify, file_get_contents(config_path('fortify.php')), 're-running must leave fortify.php as the first run left it');
+
+        // The doctor reads the live config, which this process loaded before
+        // the installer patched the file; a real `php artisan` starts fresh.
+        // Likewise it asks the app's User model, which Testbench neither
+        // configures nor autoloads.
+        config(['fortify' => require config_path('fortify.php')]);
+        config(['admin' => require config_path('admin.php')]);
+        config(['auth.providers.users.model' => 'App\\Models\\User']);
+        spl_autoload_register(function (string $class): void {
+            $path = app_path(str_replace('\\', '/', substr($class, 4)).'.php');
+
+            if (str_starts_with($class, 'App\\') && file_exists($path)) {
+                require $path;
+            }
+        });
+
         // A freshly-completed install should pass its own health check. This
         // (via the storage-link check) is also the regression net for the
         // trait-static deferred-queue bug: module deferrals must reach the
         // parent installer's drain.
-        $this->artisan('ui-kit:doctor')->assertSuccessful();
+        $status = Artisan::call('ui-kit:doctor');
+        $doctor = Artisan::output();
+        $this->assertSame(0, $status, $doctor);
+
+        foreach (['fortify features limited to two-factor', 'two-factor columns hidden on the User model', 'sidebar badges resolve'] as $row) {
+            $this->assertMatchesRegularExpression('/'.preg_quote($row, '/').'\s*\|\s*✓ pass/u', $doctor);
+        }
     }
 
     public function test_skeleton_instrument_sans_is_removed_from_app_css(): void

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -35,9 +36,14 @@ class LoginForm extends Form
         $this->ensureIsNotRateLimited();
 
         $guard = Auth::guard('web');
+        $credentials = $this->only(['email', 'password']);
 
-        if (! $guard->validate($this->only(['email', 'password']))) {
+        if (! $guard->validate($credentials)) {
             RateLimiter::hit($this->throttleKey());
+
+            // validate() fires no event, unlike attempt(); fire the one
+            // attempt() would, so listeners and audit logs see the failure.
+            event(new Failed('web', $guard->getLastAttempted(), $credentials));
 
             throw ValidationException::withMessages([
                 'form.email' => trans('auth.failed'),
@@ -49,7 +55,7 @@ class LoginForm extends Form
         RateLimiter::clear($this->throttleKey());
 
         if ($this->twoFactorChallengeRequired($user)) {
-            request()->session()->put([
+            session()->put([
                 'ui-kit.login.id' => $user->getAuthIdentifier(),
                 'ui-kit.login.remember' => $this->remember,
             ]);

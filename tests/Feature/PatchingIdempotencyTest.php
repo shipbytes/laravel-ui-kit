@@ -2,8 +2,11 @@
 
 namespace Shipbytes\UiKit\Tests\Feature;
 
+use Illuminate\Console\Command;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Filesystem\Filesystem;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Shipbytes\UiKit\Console\InstallCommand;
 use Shipbytes\UiKit\Console\InstallModuleCommand;
 use Shipbytes\UiKit\Tests\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -151,9 +154,88 @@ class PatchingIdempotencyTest extends TestCase
         $this->assertMatchesRegularExpression('/ui-kit:user-routes-start \*\/\n    Route::impersonate\(\);\n    \/\* ui-kit:user-routes-end/', $contents);
     }
 
-    private function makeCommand(): InstallModuleCommand
+    public function test_fortify_features_patch_is_idempotent(): void
     {
-        $command = new InstallModuleCommand;
+        // Fortify's own published stub, whose passkeys() call spans three lines.
+        copy(__DIR__.'/../../vendor/laravel/fortify/stubs/fortify.php', $this->configDir.'/fortify.php');
+        $command = $this->makeCommand(new InstallCommand);
+
+        $this->invoke($command, 'configureFortify');
+        $first = file_get_contents($this->configDir.'/fortify.php');
+
+        $this->invoke($command, 'configureFortify');
+        $second = file_get_contents($this->configDir.'/fortify.php');
+
+        $features = (require $this->configDir.'/fortify.php')['features'];
+
+        $this->assertSame(['two-factor-authentication'], array_values($features), 'only two-factor (and email verification, when the app turns it on) may stay');
+        $this->assertStringContainsString("        // Features::passkeys([\n            // 'confirmPassword' => true,\n        // ]),", $first);
+        $this->assertSame($first, $second, 'a second run must change nothing');
+
+        @unlink($this->configDir.'/fortify.php');
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function userModels(): array
+    {
+        return [
+            'Laravel 12 $hidden property' => [
+                "class User extends Authenticatable\n{\n    use \\App\\Models\\Concerns\\UiKitUser;\n\n    protected \$hidden = [\n        'password',\n        'remember_token',\n    ];\n}\n",
+                "    protected \$hidden = [\n        'password',\n        'remember_token',\n        'two_factor_secret',\n        'two_factor_recovery_codes',\n    ];",
+            ],
+            'Laravel 13 #[Hidden] attribute' => [
+                "#[Hidden(['password', 'remember_token'])]\nclass User extends Authenticatable\n{\n    use \\App\\Models\\Concerns\\UiKitUser;\n}\n",
+                "#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]",
+            ],
+            'one column already listed' => [
+                "class User extends Authenticatable\n{\n    protected \$hidden = ['password', 'two_factor_secret'];\n}\n",
+                "protected \$hidden = ['password', 'two_factor_secret', 'two_factor_recovery_codes'];",
+            ],
+            'no list at all' => [
+                "class User extends Authenticatable\n{\n    use \\App\\Models\\Concerns\\UiKitUser;\n    use Notifiable;\n\n    protected \$fillable = ['name'];\n}\n",
+                "    use Notifiable;\n\n    protected \$hidden = ['two_factor_secret', 'two_factor_recovery_codes'];\n\n    protected \$fillable = ['name'];",
+            ],
+        ];
+    }
+
+    #[DataProvider('userModels')]
+    public function test_hidden_two_factor_columns_patch_is_idempotent(string $class, string $expected): void
+    {
+        config(['ui-kit.installed_modules' => ['profile']]);
+        (new Filesystem)->ensureDirectoryExists(app_path('Models'));
+        $path = app_path('Models/User.php');
+        file_put_contents($path, "<?php\n\nnamespace App\\Models;\n\nuse Illuminate\\Database\\Eloquent\\Attributes\\Hidden;\nuse Illuminate\\Foundation\\Auth\\User as Authenticatable;\nuse Illuminate\\Notifications\\Notifiable;\n\n".$class);
+
+        $command = $this->makeCommand();
+
+        $this->assertTrue($this->invoke($command, 'hideTwoFactorColumns'));
+        $first = file_get_contents($path);
+        $this->assertTrue($this->invoke($command, 'hideTwoFactorColumns'));
+
+        $this->assertStringContainsString($expected, $first);
+        $this->assertSame(1, substr_count($first, "'two_factor_secret'"));
+        $this->assertSame($first, file_get_contents($path), 'a second run must change nothing');
+
+        @unlink($path);
+    }
+
+    public function test_hidden_patch_leaves_a_model_without_the_profile_module_alone(): void
+    {
+        config(['ui-kit.installed_modules' => ['support-tickets']]);
+        (new Filesystem)->ensureDirectoryExists(app_path('Models'));
+        file_put_contents(app_path('Models/User.php'), $model = "<?php\n\nclass User\n{\n    protected \$hidden = ['password'];\n}\n");
+
+        $this->assertTrue($this->invoke($this->makeCommand(), 'hideTwoFactorColumns'));
+        $this->assertSame($model, file_get_contents(app_path('Models/User.php')));
+
+        @unlink(app_path('Models/User.php'));
+    }
+
+    private function makeCommand(?Command $command = null): Command
+    {
+        $command ??= new InstallModuleCommand;
         $command->setLaravel($this->app);
 
         // Wire a no-op output so $this->line() / $this->warn() don't blow up.

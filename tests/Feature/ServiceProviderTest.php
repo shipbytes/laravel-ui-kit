@@ -4,6 +4,7 @@ namespace Shipbytes\UiKit\Tests\Feature;
 
 use Illuminate\Support\ServiceProvider;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
+use Shipbytes\UiKit\Support\DefaultBadgeResolver;
 use Shipbytes\UiKit\Support\ModuleRegistry;
 use Shipbytes\UiKit\Support\NullBadgeResolver;
 use Shipbytes\UiKit\Tests\TestCase;
@@ -24,12 +25,22 @@ class ServiceProviderTest extends TestCase
         $this->assertSame($a, $b);
     }
 
-    public function test_badge_resolver_defaults_to_null_impl(): void
+    public function test_badge_resolver_defaults_to_the_kits_counter(): void
     {
         $resolver = $this->app->make(SidebarBadgeResolver::class);
 
-        $this->assertInstanceOf(NullBadgeResolver::class, $resolver);
+        $this->assertInstanceOf(DefaultBadgeResolver::class, $resolver);
+        // Neither module's model exists here, so there is nothing to count.
         $this->assertSame([], $resolver->counts());
+        $this->assertSame($resolver, $this->app->make(SidebarBadgeResolver::class), 'one resolver, and one set of counts, per request');
+    }
+
+    public function test_an_apps_own_badge_resolver_wins(): void
+    {
+        // What an app's AppServiceProvider does; it registers after the kit.
+        $this->app->bind(SidebarBadgeResolver::class, NullBadgeResolver::class);
+
+        $this->assertInstanceOf(NullBadgeResolver::class, $this->app->make(SidebarBadgeResolver::class));
     }
 
     public function test_commands_are_registered(): void

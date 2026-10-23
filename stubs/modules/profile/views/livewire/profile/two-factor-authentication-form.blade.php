@@ -16,10 +16,14 @@ new class extends Component
 
     public function enableTwoFactorAuthentication(EnableTwoFactorAuthentication $enable): void
     {
+        if (! $this->passwordRecentlyConfirmed()) {
+            return;
+        }
+
         $enable(Auth::user());
 
         if (! $this->confirmationRequired()) {
-            $this->showRecoveryCodes();
+            $this->loadRecoveryCodes();
         }
     }
 
@@ -33,25 +37,36 @@ new class extends Component
         $confirm(Auth::user(), $this->confirmationCode);
 
         $this->confirmationCode = '';
-        $this->showRecoveryCodes();
+        $this->loadRecoveryCodes();
         $this->dispatch('two-factor-enabled');
     }
 
     public function showRecoveryCodes(): void
     {
-        $this->recoveryCodes = json_decode(decrypt(Auth::user()->two_factor_recovery_codes), true) ?: [];
-        $this->showingRecoveryCodes = true;
+        if (! $this->passwordRecentlyConfirmed()) {
+            return;
+        }
+
+        $this->loadRecoveryCodes();
     }
 
     public function regenerateRecoveryCodes(GenerateNewRecoveryCodes $generate): void
     {
+        if (! $this->passwordRecentlyConfirmed()) {
+            return;
+        }
+
         $generate(Auth::user());
-        $this->showRecoveryCodes();
+        $this->loadRecoveryCodes();
         $this->dispatch('recovery-codes-regenerated');
     }
 
     public function disableTwoFactorAuthentication(DisableTwoFactorAuthentication $disable): void
     {
+        if (! $this->passwordRecentlyConfirmed()) {
+            return;
+        }
+
         $disable(Auth::user());
 
         $this->showingRecoveryCodes = false;
@@ -59,6 +74,36 @@ new class extends Component
         $this->confirmationCode = '';
 
         $this->dispatch('two-factor-disabled');
+    }
+
+    protected function loadRecoveryCodes(): void
+    {
+        $this->recoveryCodes = Auth::user()->recoveryCodes() ?: [];
+        $this->showingRecoveryCodes = true;
+    }
+
+    /**
+     * Fortify's confirmPassword option puts its own 2FA endpoints behind the
+     * password.confirm middleware. This card calls the actions directly, so
+     * it applies the same rule itself: a stale confirmation sends the user to
+     * the confirm-password page, which brings them back here afterwards.
+     */
+    protected function passwordRecentlyConfirmed(): bool
+    {
+        if (! Features::optionEnabled(Features::twoFactorAuthentication(), 'confirmPassword')) {
+            return true;
+        }
+
+        $confirmedAt = (int) session('auth.password_confirmed_at', 0);
+
+        if (time() - $confirmedAt < (int) config('auth.password_timeout', 10800)) {
+            return true;
+        }
+
+        session()->put('url.intended', route('profile'));
+        $this->redirectRoute('password.confirm', navigate: true);
+
+        return false;
     }
 
     public function twoFactorEnabled(): bool

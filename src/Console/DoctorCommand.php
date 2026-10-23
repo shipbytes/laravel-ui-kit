@@ -4,8 +4,12 @@ namespace Shipbytes\UiKit\Console;
 
 use Composer\InstalledVersions;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Laravel\Fortify\Features;
+use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
+use Shipbytes\UiKit\Support\DefaultBadgeResolver;
 
 class DoctorCommand extends Command
 {
@@ -20,6 +24,11 @@ class DoctorCommand extends Command
 
     public function handle(): int
     {
+        // The container hands Artisan::call() the same instance every time,
+        // so a second run in one process would inherit the first one's rows.
+        $this->results = [];
+        $this->failed = false;
+
         $this->checkPublishedFiles();
         $this->checkLivewire();
         $this->checkFortify();
@@ -28,6 +37,7 @@ class DoctorCommand extends Command
         $this->checkUserTrait();
         $this->checkModuleRequirements();
         $this->checkDuplicateRouteNames();
+        $this->checkTrustedProxies();
         $this->checkMail();
 
         $this->table(['Check', 'Status', 'Hint'], $this->results);
@@ -189,6 +199,30 @@ class DoctorCommand extends Command
         } else {
             $this->failCheck('fortify views disabled', "set 'views' => false in config/fortify.php so Fortify doesn't collide with the kit's auth pages");
         }
+
+        // Fortify's own POST /login redirects a two-factor user to this name;
+        // routes/auth.php from before 0.4.1 lacks it, so that redirect 500s.
+        if (! Features::enabled(Features::twoFactorAuthentication())) {
+            $this->skipCheck('two-factor.login route registered', 'two-factor authentication is off');
+        } elseif (Route::has('two-factor.login')) {
+            $this->passCheck('two-factor.login route registered');
+        } else {
+            $this->failCheck('two-factor.login route registered', "add Route::redirect('two-factor-login', '/two-factor-challenge')->name('two-factor.login'); beside the two-factor-challenge route in routes/auth.php, or re-run php artisan ui-kit:install --force --modules=<the installed ones> (Fortify's POST /login sends two-factor users there)");
+        }
+
+        // Read the live config, not the file: a cached config is what serves.
+        $live = array_values(array_filter(
+            InstallCommand::FORTIFY_FEATURES_OFF,
+            fn (string $feature) => Features::enabled(Features::{$feature}())
+        ));
+
+        if ($live === []) {
+            $this->passCheck('fortify features limited to two-factor');
+        } else {
+            $lines = implode(', ', array_map(fn (string $feature) => "Features::{$feature}()", $live));
+
+            $this->failCheck('fortify features limited to two-factor', "comment out {$lines} in config/fortify.php: their POST/PUT endpoints call actions no kit app binds and 500 (the kit's own pages do those jobs), or re-run php artisan ui-kit:install");
+        }
     }
 
     protected function checkViteWiring(): void
@@ -260,6 +294,59 @@ class DoctorCommand extends Command
         $this->checkFontOverride();
         $this->checkNavIcons();
         $this->checkAdminPagination();
+        $this->checkSidebarBadges();
+    }
+
+    /**
+     * A nav entry's `badge` key names a count the bound resolver returns. A
+     * key the resolver never returns shows no badge, which looks exactly like
+     * a count of zero, so nothing ever says the badge is unwired.
+     */
+    protected function checkSidebarBadges(): void
+    {
+        $check = 'sidebar badges resolve';
+        $keys = [];
+
+        foreach ((array) config('admin.nav', []) as $item) {
+            if (is_array($item) && isset($item['badge']) && is_string($item['badge'])) {
+                $keys[$item['badge']] = $item['label'] ?? $item['badge'];
+            }
+        }
+
+        if ($keys === []) {
+            $this->skipCheck($check, 'no nav entry declares a badge');
+
+            return;
+        }
+
+        try {
+            $resolver = app(SidebarBadgeResolver::class);
+            $counts = $resolver->counts();
+        } catch (\Throwable $e) {
+            $this->skipCheck($check, 'the resolver could not count: '.$e->getMessage());
+
+            return;
+        }
+
+        $missing = array_diff_key($keys, $counts);
+
+        if ($missing === []) {
+            $this->passCheck($check);
+
+            return;
+        }
+
+        $failures = $resolver instanceof DefaultBadgeResolver ? array_intersect_key($resolver->failures, $missing) : [];
+
+        if ($failures !== []) {
+            $this->failCheck($check, 'could not count '.implode('; ', array_map(fn ($key, $why) => "{$key}: {$why}", array_keys($failures), $failures)).'. Run php artisan migrate, or remove the module\'s nav entry from config/admin.php');
+
+            return;
+        }
+
+        $listed = implode(', ', array_map(fn ($key, $label) => "{$label} => {$key}", array_keys($missing), $missing));
+
+        $this->failCheck($check, $resolver::class." returns no count for {$listed}: return those keys from your SidebarBadgeResolver, or remove your binding to use the kit's DefaultBadgeResolver (it counts open_tickets and unread_contacts when their modules are installed)");
     }
 
     /**
@@ -386,6 +473,16 @@ class DoctorCommand extends Command
             } else {
                 $this->failCheck('impersonation routes registered', 'add `Route::impersonate();` between the ui-kit:user-routes markers in routes/ui-kit-user.php, or re-run php artisan ui-kit:install-module impersonation');
             }
+
+            $detail = resource_path('views/livewire/admin/users/user-detail.blade.php');
+
+            if (! file_exists(resource_path('views/partials/impersonation-button.blade.php'))) {
+                $this->failCheck('impersonation button wired', 'resources/views/partials/impersonation-button.blade.php is missing: re-run php artisan ui-kit:install-module impersonation');
+            } elseif (file_exists($detail) && str_contains((string) file_get_contents($detail), 'partials.impersonation-button')) {
+                $this->passCheck('impersonation button wired');
+            } else {
+                $this->failCheck('impersonation button wired', "the user detail page never shows it: add @includeIf('partials.impersonation-button', ['user' => \$user]) to resources/views/livewire/admin/users/user-detail.blade.php, or republish with php artisan ui-kit:install --force");
+            }
         }
 
         if (! in_array('profile', $installed, true)) {
@@ -398,6 +495,8 @@ class DoctorCommand extends Command
             $this->failCheck('storage linked (profile avatars)', 'run php artisan storage:link');
         }
 
+        $this->checkTwoFactorColumnsHidden();
+
         try {
             if (Schema::hasColumn('users', 'two_factor_secret')) {
                 $this->passCheck('two-factor columns migrated');
@@ -406,6 +505,36 @@ class DoctorCommand extends Command
             }
         } catch (\Throwable $e) {
             $this->skipCheck('two-factor columns migrated', 'database not reachable: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Asks the model rather than reading the file, so a $hidden property, a
+     * #[Hidden] attribute and a $visible allow-list all count.
+     */
+    protected function checkTwoFactorColumnsHidden(): void
+    {
+        $check = 'two-factor columns hidden on the User model';
+        $model = (string) config('auth.providers.users.model', 'App\\Models\\User');
+
+        if (! class_exists($model)) {
+            $this->skipCheck($check, "user model {$model} not found");
+
+            return;
+        }
+
+        /** @var Model $user */
+        $user = new $model;
+        $exposed = array_values(array_filter(
+            ['two_factor_secret', 'two_factor_recovery_codes'],
+            fn (string $column) => ! in_array($column, $user->getHidden(), true)
+                && ($user->getVisible() === [] || in_array($column, $user->getVisible(), true))
+        ));
+
+        if ($exposed === []) {
+            $this->passCheck($check);
+        } else {
+            $this->failCheck($check, 'add '.implode(' and ', array_map(fn ($c) => "'{$c}'", $exposed)).' to $hidden in app/Models/User.php: toArray() and JSON of a user carry them');
         }
     }
 
@@ -427,6 +556,28 @@ class DoctorCommand extends Command
             $this->passCheck('no duplicate route names');
         } else {
             $this->failCheck('no duplicate route names', 'route:cache will fail — duplicated: '.implode(', ', array_slice($duplicates, 0, 5)));
+        }
+    }
+
+    /**
+     * Behind a load balancer or CDN that the app does not trust, every request
+     * arrives from the proxy's address. The kit's limiters key on the IP, so
+     * one visitor's ten registrations an hour lock out everyone, and five bad
+     * logins lock that email out for the whole internet.
+     */
+    protected function checkTrustedProxies(): void
+    {
+        $check = 'trusted proxies configured';
+        $app = base_path('bootstrap/app.php');
+        $hint = "if a proxy or CDN sits in front of the app, call \$middleware->trustProxies(at: [...]) in bootstrap/app.php; otherwise every visitor shares the proxy's IP and the login and register limiters lock everyone out together";
+
+        // A commented-out call (the docs' example, say) does not count.
+        if (file_exists($app) && preg_match('/^(?![ \t]*(?:\/\/|\*|#)).*trustProxies\(/m', (string) file_get_contents($app))) {
+            $this->passCheck($check);
+        } elseif (! $this->laravel->environment('production')) {
+            $this->skipCheck($check, 'not production; '.$hint);
+        } else {
+            $this->failCheck($check, $hint.' (no proxy at all? trustProxies(at: []) says so and passes this check)');
         }
     }
 

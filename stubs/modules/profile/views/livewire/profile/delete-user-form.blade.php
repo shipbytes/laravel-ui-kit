@@ -2,6 +2,7 @@
 
 use App\Livewire\Actions\Logout;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 new class extends Component
@@ -14,7 +15,15 @@ new class extends Component
             'password' => ['required', 'string', 'current_password'],
         ]);
 
-        tap(Auth::user(), $logout(...))->delete();
+        $user = Auth::user();
+
+        // The photo lives on the public disk under a random name, so nothing
+        // would ever find it again once the row is gone.
+        if ($user->avatar_path ?? null) {
+            Storage::disk('public')->delete($user->avatar_path);
+        }
+
+        tap($user, $logout(...))->delete();
 
         $this->redirect('/', navigate: true);
     }

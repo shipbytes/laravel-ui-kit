@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -15,6 +16,17 @@ new #[Layout('layouts.guest')] class extends Component
 
             return;
         }
+
+        // Six a minute per user, shared with the profile page's re-send link.
+        $throttleKey = 'verification-resend:'.Auth::id();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 6)) {
+            Session::flash('status', 'verification-throttled');
+
+            return;
+        }
+
+        RateLimiter::hit($throttleKey, 60);
 
         Auth::user()->sendEmailVerificationNotification();
         Session::flash('status', 'verification-link-sent');
@@ -40,6 +52,8 @@ new #[Layout('layouts.guest')] class extends Component
 
     @if (session('status') == 'verification-link-sent')
         <x-ds::alert tone="success" class="mb-6">A new verification link has been sent to your email address.</x-ds::alert>
+    @elseif (session('status') == 'verification-throttled')
+        <x-ds::alert tone="warning" class="mb-6">Too many requests. Please wait a minute before asking for another link.</x-ds::alert>
     @endif
 
     <div class="space-y-3">

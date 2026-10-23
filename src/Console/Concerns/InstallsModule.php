@@ -219,8 +219,20 @@ trait InstallsModule
 
         if ($hasProfile) {
             // Powers the profile page's 2FA card and the login challenge.
+            $imports[] = 'use Illuminate\\Support\\Facades\\Storage;';
             $imports[] = 'use Laravel\\Fortify\\TwoFactorAuthenticatable;';
             $traitUses[] = 'use TwoFactorAuthenticatable;';
+            // The URL only: an exists() call per avatar would be a filesystem
+            // (or S3) round trip for every row of the admin user list.
+            $methods[] = <<<'PHP'
+
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_path
+            ? Storage::disk('public')->url($this->avatar_path)
+            : null;
+    }
+PHP;
         }
 
         if ($hasImpersonate) {
@@ -242,6 +254,7 @@ trait InstallsModule
 PHP;
         }
 
+        sort($imports);
         $importsBlock = implode("\n", $imports);
         $usesBlock = $traitUses === [] ? '' : '    '.implode("\n    ", $traitUses)."\n";
         $methodsBlock = implode("\n", $methods);
@@ -333,6 +346,105 @@ PHP;
         }
 
         $this->line('  ✓ applied UiKitUser trait to <info>app/Models/User.php</info>');
+
+        return true;
+    }
+
+    /**
+     * The profile module puts TwoFactorAuthenticatable on the User model, and
+     * nothing hides its columns: a user's toArray() / JSON would carry the
+     * encrypted secret and recovery codes. Add both to the model's hidden list,
+     * whether it is a `$hidden` property (Laravel 12 skeleton) or a
+     * `#[Hidden([...])]` attribute (Laravel 13). Returns true when they are
+     * (or already were) hidden, or when there is nothing to hide.
+     */
+    protected function hideTwoFactorColumns(): bool
+    {
+        if (! in_array('profile', config('ui-kit.installed_modules', []), true)) {
+            return true;
+        }
+
+        $path = app_path('Models/User.php');
+        $manualHint = "add 'two_factor_secret' and 'two_factor_recovery_codes' to your User model's \$hidden";
+
+        if (! file_exists($path)) {
+            $this->warn("  ! app/Models/User.php not found — {$manualHint}");
+
+            return false;
+        }
+
+        $contents = (string) file_get_contents($path);
+        $patched = null;
+        $missing = [];
+
+        foreach ([
+            '/(protected\s+\$hidden\s*=\s*\[)(.*?)(\s*\]\s*;)/s',
+            '/(#\[Hidden\(\s*\[)(.*?)(\s*\]\s*\)\])/s',
+        ] as $pattern) {
+            if (! preg_match($pattern, $contents, $m)) {
+                continue;
+            }
+
+            $missing = array_values(array_filter(
+                ['two_factor_secret', 'two_factor_recovery_codes'],
+                fn (string $column) => ! preg_match('/[\'"]'.$column.'[\'"]/', $m[2])
+            ));
+
+            if ($missing === []) {
+                $this->line('  ✓ two-factor columns already hidden on <info>app/Models/User.php</info>');
+
+                return true;
+            }
+
+            $body = rtrim($m[2]);
+            $quoted = array_map(fn (string $column) => "'{$column}'", $missing);
+
+            if ($body === '') {
+                $list = implode(', ', $quoted);
+            } elseif (preg_match('/\n([ \t]+)\S/', $m[2], $indent)) {
+                // A multi-line list gets one entry per line at its own indentation.
+                $list = rtrim($body, ',').",\n".$indent[1].implode(",\n".$indent[1], $quoted).',';
+            } else {
+                $list = rtrim($body, ', ').', '.implode(', ', $quoted);
+            }
+
+            $patched = str_replace($m[0], $m[1].$list.$m[3], $contents);
+
+            break;
+        }
+
+        if ($patched === null) {
+            // No list at all, so nothing was hidden: give the model one, after
+            // its trait uses.
+            $missing = ['two_factor_secret', 'two_factor_recovery_codes'];
+            $patched = preg_replace_callback(
+                '/class\s+User\b[^{]*\{(?:\s*use\s+[^;]+;)*/s',
+                fn (array $m): string => $m[0]."\n\n    protected \$hidden = ['two_factor_secret', 'two_factor_recovery_codes'];",
+                $contents,
+                1,
+                $count
+            );
+
+            if ($patched === null || $count !== 1) {
+                $this->warn("  ! could not locate the User class declaration — {$manualHint}");
+
+                return false;
+            }
+        }
+
+        file_put_contents($path, $patched);
+
+        $lint = new Process([PHP_BINARY, '-l', $path]);
+        $lint->run();
+
+        if (! $lint->isSuccessful()) {
+            file_put_contents($path, $contents);
+            $this->warn("  ! hiding the two-factor columns produced invalid PHP — reverted; {$manualHint}");
+
+            return false;
+        }
+
+        $this->line('  ✓ hid <info>'.implode(', ', $missing).'</info> on <info>app/Models/User.php</info>');
 
         return true;
     }

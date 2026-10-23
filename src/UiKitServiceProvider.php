@@ -17,8 +17,8 @@ use Shipbytes\UiKit\Console\InstallModuleCommand;
 use Shipbytes\UiKit\Console\ListModulesCommand;
 use Shipbytes\UiKit\Console\MakeAdminCommand;
 use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
+use Shipbytes\UiKit\Support\DefaultBadgeResolver;
 use Shipbytes\UiKit\Support\ModuleRegistry;
-use Shipbytes\UiKit\Support\NullBadgeResolver;
 use Shipbytes\UiKit\Support\VoltCompat;
 use Shipbytes\UiKit\View\Components\UiKitBanners;
 use Shipbytes\UiKit\View\Components\UiKitHead;
@@ -30,7 +30,10 @@ class UiKitServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../stubs/core/config/ui-kit.php', 'ui-kit');
 
         $this->app->singleton(ModuleRegistry::class);
-        $this->app->bind(SidebarBadgeResolver::class, NullBadgeResolver::class);
+        // Scoped: one instance, and so one set of count queries, per request
+        // (or per Octane request). An app's own binding registers after this
+        // provider and replaces it.
+        $this->app->scoped(SidebarBadgeResolver::class, DefaultBadgeResolver::class);
 
         $this->registerVoltCompat();
     }
