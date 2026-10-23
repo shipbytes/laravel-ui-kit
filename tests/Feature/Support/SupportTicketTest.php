@@ -230,7 +230,7 @@ class SupportTicketTest extends InstalledKitTestCase
             ->assertSet('reply', '')
             ->assertSee('Your reply was added.');
 
-        $reply = $ticket->replies()->latest('id')->first();
+        $reply = $ticket->replies()->reorder('id', 'desc')->first();
         $this->assertSame('ok', $reply->message);
         $this->assertFalse($reply->is_admin_reply);
 

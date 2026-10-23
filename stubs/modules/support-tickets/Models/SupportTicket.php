@@ -80,7 +80,8 @@ class SupportTicket extends Model
 
     public function replies(): HasMany
     {
-        return $this->hasMany(TicketReply::class, 'ticket_id')->orderBy('created_at', 'asc');
+        // id breaks a tie: two replies in the same second keep the order they were written.
+        return $this->hasMany(TicketReply::class, 'ticket_id')->orderBy('created_at')->orderBy('id');
     }
 
     public function scopeOpen($query)

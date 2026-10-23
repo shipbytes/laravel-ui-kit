@@ -102,7 +102,7 @@ class SupportTicketMailTest extends InstalledKitTestCase
         Mail::assertQueuedCount(2);
         Mail::assertQueued(TicketReplyMail::class, fn (TicketReplyMail $mail) => $mail->hasTo($this->admin->email) && $mail->toAdmin);
 
-        $mail = new TicketReplyMail($ticket, $ticket->replies()->latest('id')->first(), toAdmin: true);
+        $mail = new TicketReplyMail($ticket, $ticket->replies()->reorder('id', 'desc')->first(), toAdmin: true);
         $mail->assertHasSubject('[Support] New reply: Export is broken');
         $mail->assertHasReplyTo('olive@example.com');
         $mail->assertSeeInHtml('Here is the screenshot you asked for.');
@@ -125,7 +125,7 @@ class SupportTicketMailTest extends InstalledKitTestCase
         Mail::assertQueuedCount(1);
         Mail::assertQueued(TicketReplyMail::class, fn (TicketReplyMail $mail) => $mail->hasTo('olive@example.com') && ! $mail->toAdmin);
 
-        $mail = new TicketReplyMail($ticket, $ticket->replies()->latest('id')->first(), toAdmin: false);
+        $mail = new TicketReplyMail($ticket, $ticket->replies()->reorder('id', 'desc')->first(), toAdmin: false);
         $mail->assertHasSubject('New reply to your ticket: Export is broken');
         $mail->assertSeeInHtml('Hi Olive Owner');
         $mail->assertSeeInHtml('We have fixed the export, please try again.');

@@ -115,6 +115,12 @@ New routes make it a minor release: "Upgrading from 0.4" at the end has the step
   note the queue worker and `MAIL_FROM_ADDRESS` instead. Module summaries in
   `ui-kit:list-modules` describe both halves.
 
+### Fixed
+
+- **A ticket's conversation keeps its order.** `SupportTicket::replies()` sorted
+  by `created_at` alone, so two messages written in the same second could show in
+  either order, on the admin page too. The id now breaks the tie.
+
 ### Upgrading from 0.4
 
 1. `composer require shipbytes/laravel-ui-kit:^0.5`.
