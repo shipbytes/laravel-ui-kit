@@ -10,173 +10,172 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
-0.4.0: the kit moves onto the Shipbytes design system. The layouts, the
-shared components, the auth pages, the profile page and the nine admin screens
-are all built on it.
+0.4.0 moves the kit onto the Shipbytes design system (`shipbytes/blade-ui`).
+The layouts, the shared components, the seven auth pages, the profile page and
+the nine admin screens are all built from its `ds::` components and semantic
+tokens; the kit no longer carries a palette, fonts or components of its own.
+Every route, route name, `wire:model`, Livewire method, validation message and
+`config('ui-kit.copy.*')` string is unchanged. What changes is every file the
+kit publishes, so an app on 0.3 has to merge: "Upgrading from 0.3" at the
+end of this entry lists the steps.
 
-### Changed
+### Breaking
 
-- **Breaking: built on the Shipbytes design system (`shipbytes/blade-ui`).**
-  The kit no longer carries a palette, fonts or components of its own. The
-  admin shell, the user shell, the guest layout, the theme toggle, the session
-  status message, the impersonation ribbon and button, the seven auth pages
-  and the profile page now use `ds::` components and the design system's
-  semantic tokens (`bg-surface`, `text-fg-muted`, `border-border`, …), which
-  switch for dark mode on their own. The phone's "More" menu is the design
-  system's bottom sheet. The accent colour is the design system's blue, and
-  its Inter is the one font the layouts load. Every `wire:model`, action,
-  validation message and `config('ui-kit.copy.*')` string is unchanged. On
-  the profile page:
-  - **The avatar field is a drop zone.** The photo shows as a round
-    `ds::avatar` (initials when there is none) beside a `ds::file-upload`
-    labelled "Profile photo"; Save photo, Cancel and Remove sit under it. The
-    hover overlay on the old square thumbnail is gone.
-  - **Account deletion confirms in `ds::modal`.** The dialog is opened by
-    Alpine state on the form (`confirmingDeletion`) instead of the
-    `open-modal` window event, stays open with the error shown after a wrong
-    password, and closes with Cancel, the backdrop or Escape.
-  - The two-factor confirm form now shows Fortify's "invalid code" message
-    under the code field rather than below the buttons.
-
-  To take the new auth and profile views into an existing app,
-  `php artisan vendor:publish --tag=ui-kit-views --force` and
-  `php artisan ui-kit:install-module profile --force` (back up any of these
-  you edited first).
-  Composer installs `shipbytes/blade-ui` with the kit. The
-  published `resources/css/ui-kit.css` imports its `tokens.css` and `theme.css`
-  and adds the `@source` line Tailwind needs to see its components, so
-  `app.css` still imports only `./ui-kit.css`. To upgrade a 0.3 app:
-  1. `composer require shipbytes/laravel-ui-kit:^0.4 -W`.
-  2. `php artisan vendor:publish --tag=ui-kit-assets --force` to replace
-     `resources/css/ui-kit.css` and `resources/js/ui-kit.js`, and
-     `php artisan vendor:publish --tag=ui-kit-views --force` to replace the
-     layouts (back up any of these you edited first).
-  3. Delete `resources/css/ui-kit-theme.css`.
-  4. Move any token overrides you made there into `resources/css/app.css`,
-     after the `ui-kit.css` import, as `--ds-*` variables, e.g.
-     `:root { --ds-accent: … }`. `brand-*`, `font-boldtext` and
-     `font-booktext` classes in your own views no longer exist.
-  5. In `config/admin.php`, rename every nav `icon` to a
-     [Heroicons v2](https://heroicons.com) outline name. This includes the
-     kit's own entries, which the installer does not rewrite once they exist:
-     `grid` → `squares-2x2`, `note` → `document-text`, `mail` → `envelope`,
-     `chart` → `chart-bar`, `history` → `clock`; `users`, `ticket`, `clock`
-     and `user-circle` stay as they are.
-  6. `php artisan ui-kit:doctor`. Every row should pass.
-- **The nine admin screens are on the design system**: the dashboard, the
-  users list and detail, the support tickets list and detail, contact
-  messages, the changelog list and form, and the activity log. Each opens
-  with the new page header; lists are `ds::table` with `ds::badge` statuses,
-  a `ds::empty-state` row when nothing matches, and the design system's
-  pagination; filters are native selects and a search field with an icon;
-  the dashboard and the ticket and contact counts are `ds::stat-tile`s; flash
-  messages are `ds::alert`. Every `wire:model`, method, route and validation
-  message is unchanged. Notable changes:
-  - **Contact messages are a table with a select column.** Each row has a
-    checkbox labelled "Select" plus the message's subject for screen readers, the header has
-    "Select all", and the bulk bar (Mark read, Mark unread, Archive, Delete)
-    appears when anything is selected. A message opens in `ds::modal`, driven
-    by the component's `showModal` through `$wire.entangle()`; closing it with
-    the ✕, the backdrop or Escape calls `closeModal()` on the server as the
-    old close button did.
-  - **The changelog's Published toggle is `ds::switch`** bound with
-    `wire:model`, saved with the form like every other field, with a line
-    under it saying so. The old toggle saved nothing on its own either, but
-    looked as if it did.
-  - **Rows link through a View (or Open) button** in a trailing column, with
-    `wire:navigate`. The design system has no whole-row link.
-  - The ticket list is a table (Subject, From, Status, Priority, Category,
-    Updated) instead of a list of cards; the ticket's Status and Priority
-    selects share one panel with visible labels.
-  - The activity log drops its Log column: the log name is a small outline
-    badge under the event. Its filters have visible labels.
-  - Badge tones come from one method per concept on the model:
-    `SupportTicket::statusTone()` and `priorityTone()`,
-    `ContactSubmission::statusTone()`, `ChangelogEntry::categoryTone()`.
-
-  To take them into an existing app, back up any you edited, then
-  `php artisan vendor:publish --tag=ui-kit-livewire --force`,
-  `php artisan vendor:publish --tag=ui-kit-views --force`, and
-  `php artisan ui-kit:install-module <module> --force` for each installed
-  module with an admin screen (support-tickets, contacts, changelog,
-  activity-log).
-- **Requires `shipbytes/blade-ui` ^1.2.2.** In 1.1 every `ds::button` inside a
-  Livewire component rendered with a stray `>` before its label ("> Sign in",
-  with the `>` in its accessible name): a comment in the button named a tag,
-  and Livewire placed one of its `<!--[if BLOCK]>` markers inside the real
-  button tag because of it. 1.2.0 fixes that and adds what these screens use:
-  `tone="danger"` on ghost and secondary buttons (the avatar's Remove is now
-  a quiet red ghost button rather than a ghost button with `text-danger`
-  forced on it), and a readonly look for `ds::input` (the reset-password
-  email now looks fixed instead of editable). The page tests now fail if a
-  Livewire marker ever lands inside a tag again. 1.2.1 adds `hideLabel` to
-  `ds::checkbox`, for the contact list's select column. 1.2.2 keeps a
-  `wire:model` field's id the same from one render to the next: with a random
-  id each time, Livewire replaced the field on every response, and a live
-  search lost focus and dropped whatever was typed after the first response.
-- **Nav icons are Heroicons v2 names**, rendered through `ds::icon`, so any of
-  the outline icons on heroicons.com works in `config/admin.php`.
-  The kit's own entries are now `squares-2x2` (Dashboard), `users`, `ticket`,
-  `document-text` (Changelog), `envelope` (Contacts) and `clock` (Activity).
-- **The theme follows the OS until the user picks one.** With nothing stored,
-  the theme store and the no-flash snippet now take the initial theme from
-  `prefers-color-scheme`. Before, it was always light. They also set exactly
-  one of `light` / `dark` on `<html>`: the design system's tokens follow the
-  OS whenever neither class is present, so a dark-OS user who chose light
-  would otherwise have got dark tokens.
-
-### Added
-
-- **`Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination`.** Use it
-  in place of Livewire's `WithPagination` (it includes it) and the component's
-  pages render with the design system's Livewire pagination, whose buttons
-  call `gotoPage`, `previousPage` and `nextPage` and keep the component's
-  search and filters. The five paginating admin components use it. An app
-  that defined `paginationView()` or `paginationSimpleView()` on a component
-  itself keeps its own: a class method wins over the trait's.
-- **`<x-ui-kit::page-header title="…" subtitle="…">`**, a package component
-  with an optional `actions` slot that sits right of the title and wraps under
-  it on a phone. Every admin screen opens with it. The published `ui-kit.css`
-  now `@source`s the kit's own views in `vendor/` as well, which is what gives
-  the header its classes.
-- `ui-kit:doctor` checks for the design system: `design system installed`,
-  `ui-kit.css imports the design system`, `ui-kit.css scans the kit's own
-  views`, `no leftover ui-kit-theme.css`, `nav icons are Heroicons` (it lists
-  each `label => icon` that doesn't resolve) and `admin lists paginate with
-  the design system` (it names each published admin component still on plain
-  `WithPagination`). Each failing row says how to fix it.
-- **The installer removes the Laravel 12 skeleton's Instrument Sans.** The
+- **Requires `shipbytes/blade-ui` ^1.2.2**, which Composer installs with the
+  kit. The design system's contract with an app is three lines of CSS: import
+  its `tokens.css`, import its `theme.css`, and `@source` its views so Tailwind
+  keeps the classes its components use. The published
+  `resources/css/ui-kit.css` carries all three, so `app.css` still imports only
+  `./ui-kit.css`. Without the `@source` line every `ds::` component renders as
+  unstyled HTML and nothing reports an error.
+- **`resources/css/ui-kit-theme.css` is gone**, and with it the `brand-*`
+  colour ramp and the Poppins (`font-boldtext`) and Montserrat
+  (`font-booktext`) font utilities. The accent is the design system's blue and
+  the one font is its Inter, which the kit's three layouts load from
+  fonts.bunny.net. Classes such as `bg-brand-600` or `font-boldtext` in an
+  app's own views no longer exist. Brand colours are now `--ds-*` token
+  overrides in `app.css`, after the `ui-kit.css` import
+  (`:root { --ds-accent: … }`, and `.dark { … }` for the dark value).
+- **Every published view, and the admin Livewire classes and module models,
+  are rewritten.** The layouts, `<x-theme-toggle />`, the session status
+  message, the impersonation ribbon and button, the auth pages, the profile
+  page and the nine admin screens use `ds::` components and tokens
+  (`bg-surface`, `text-fg-muted`, `border-border`, …) that switch for dark mode
+  on their own, with no palette classes or `dark:` variants. The five
+  paginating admin components use the new pagination trait (below);
+  `SupportTicket`, `ContactSubmission` and `ChangelogEntry` gain badge-tone
+  methods. An app that edited any of these files must merge its edits into
+  the new ones; re-publishing with `--force` and reading `git diff` is the
+  way to do it.
+- **Nav icons are Heroicons v2 names**, rendered through `ds::icon`, so any
+  outline icon on [heroicons.com](https://heroicons.com) works as an `icon` in
+  `config/admin.php`. The kit's own entries are now `squares-2x2` (Dashboard),
+  `users`, `ticket` (Support), `document-text` (Changelog), `envelope`
+  (Contacts) and `clock` (Activity). Of the 0.3 names, `grid`, `note`, `chart`
+  and `history` no longer resolve (use `squares-2x2`, `document-text`,
+  `chart-bar`, `clock`); `mail` still works through a design-system alias of
+  `envelope`; `users`, `ticket`, `clock` and `user-circle` are unchanged. The
+  `layouts/partials/nav-icons` partial and its hand-drawn SVGs are gone.
+- **`ui-kit.css` now carries two `@source` lines**: the design system's views,
+  and the kit's own package views in `vendor/` (`<x-ui-kit::page-header>` and
+  friends), which are not published either. A 0.3 `ui-kit.css` has neither.
+- **The installer deletes the Laravel 12 skeleton's Instrument Sans.** The
   skeleton's `app.css` ends with an `@theme` block setting `--font-sans` to
   `'Instrument Sans'`. It comes after the kit's import, so it beat the design
   system's Inter, and since nothing loads Instrument Sans the app rendered in
-  the system font. `ui-kit:install` now deletes that one declaration (and the
-  `@theme` block, if nothing else is in it); any other font is left alone. A
-  new doctor row, `app.css does not override the design system font`, fails
-  while the Instrument Sans declaration follows the import and is skipped,
-  with a reminder to load it, when the app sets a font of its own there.
-- `StubStyleTest`: the suite now fails when any published view uses a raw
-  palette class, a `dark:` variant, an inline `<svg>` or a raw form control
-  instead of the design system, or a published stylesheet sets
-  `accent-color`. It reads every stub; there is no allowlist.
+  the system font. `ui-kit:install` (including a re-run on an existing app)
+  now deletes that one declaration, and the `@theme` block if nothing else is
+  in it. A font the app chose for itself is left alone.
+- **Admin lists paginate through
+  `Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination`.** The five
+  paginating admin components (users, tickets, contacts, changelog, activity)
+  use it in place of Livewire's `WithPagination`, so their pages render with
+  the design system's Livewire pagination. `ui-kit:doctor` fails while a
+  published admin component is still on plain `WithPagination`.
+
+### Added
+
+- **`WithDesignSystemPagination`**, for an app's own Livewire lists too. It
+  includes `WithPagination`; the design system's pagination view calls
+  `gotoPage`, `previousPage` and `nextPage`, so a page change is a Livewire
+  update that keeps the component's search and filters. A component that
+  defines `paginationView()` or `paginationSimpleView()` itself keeps its own:
+  a class method wins over the trait's.
+- **`<x-ui-kit::page-header title="…" subtitle="…">`**, a package component
+  with an optional `actions` slot that sits right of the title and wraps under
+  it on a phone. Every admin screen opens with it, and an app's own admin
+  screens can too.
+- **Doctor rows for the design system**, each with a hint that says how to fix
+  it: `design system installed`, `ui-kit.css imports the design system`,
+  `ui-kit.css scans the kit's own views`, `no leftover ui-kit-theme.css`,
+  `app.css does not override the design system font` (skipped, with a
+  reminder to load the font, when the app sets a font of its own there),
+  `nav icons are Heroicons` (it lists each `label => icon` that doesn't
+  resolve) and `admin lists paginate with the design system` (it names each
+  published admin component still on plain `WithPagination`).
+- `StubStyleTest`: the suite fails when any published view uses a raw palette
+  class, a `dark:` variant, an inline `<svg>` or a raw form control instead of
+  the design system, or a published stylesheet sets `accent-color`. It reads
+  every stub; there is no allowlist.
+
+### Changed
+
+- **The theme follows the OS until the user picks one.** With nothing stored,
+  the theme store and the no-flash snippet take the initial theme from
+  `prefers-color-scheme` (in 0.3 it was always light), and the toggle stores
+  an explicit choice. Both set exactly one of `light` / `dark` on `<html>`:
+  the design system's tokens follow the OS whenever neither class is present,
+  so a dark-OS user who chose light would otherwise have got dark tokens.
+- **The profile page.** The avatar field is a drop zone: the photo shows as a
+  round `ds::avatar` (initials when there is none) beside a `ds::file-upload`
+  labelled "Profile photo", with Save photo, Cancel and Remove under it; the
+  hover overlay on the old square thumbnail is gone. Account deletion confirms
+  in `ds::modal`, opened by Alpine state on the form (`confirmingDeletion`)
+  instead of the `open-modal` window event; it stays open with the error shown
+  after a wrong password and closes with Cancel, the backdrop or Escape. The
+  two-factor confirm form shows Fortify's "invalid code" message under the
+  code field rather than below the buttons.
+- **The nine admin screens.** Each opens with the page header. Lists are
+  `ds::table` with `ds::badge` statuses, a `ds::empty-state` row when nothing
+  matches, and the design system's pagination. Filters are selects and a
+  search field with an icon, and the activity log's filters have visible
+  labels. The dashboard and the ticket and contact counts are
+  `ds::stat-tile`s; flash messages are `ds::alert`. Rows link through a View
+  (or Open) button in a trailing column, with `wire:navigate`; the design
+  system has no whole-row link. In particular:
+  - The ticket list is a table (Subject, From, Status, Priority, Category,
+    Updated) instead of a list of cards; on a ticket, the Status and Priority
+    selects share one panel with visible labels.
+  - Contact messages are a table with a select column: each row has a
+    checkbox labelled "Select" plus the subject for screen readers, the header
+    has "Select all", and the bulk bar (Mark read, Mark unread, Archive,
+    Delete) appears when anything is selected. A message opens in `ds::modal`,
+    driven by the component's `showModal` through `$wire.entangle()`; closing
+    it with the ✕, the backdrop or Escape calls `closeModal()` on the server
+    as the old close button did.
+  - The changelog's Published toggle is `ds::switch` bound with `wire:model`,
+    saved with the form like every other field, with a line under it saying
+    so. The old toggle saved nothing on its own either, but looked as if it
+    did.
+  - The activity log drops its Log column: the log name is a small outline
+    badge under the event.
+  - Badge tones come from one method per concept on the model:
+    `SupportTicket::statusTone()` and `priorityTone()`,
+    `ContactSubmission::statusTone()`, `ChangelogEntry::categoryTone()`.
+- The phone's "More" menu in the admin shell is the design system's bottom
+  sheet.
+- The design-system releases behind 1.2.2 fix and add what these screens need:
+  `tone="danger"` on ghost and secondary buttons (the avatar's Remove is a
+  quiet red ghost button), a readonly look for `ds::input` (the
+  reset-password email looks fixed instead of editable), `hideLabel` on
+  `ds::checkbox` (the contact list's select column), and a `wire:model`
+  field's id that stays the same from one render to the next, so a live
+  search keeps focus and keeps what was typed after the first response.
 
 ### Fixed
 
 - **A profile photo never saved on a standard app.** The profile module wrote
   the file to the public disk and then set `avatar_path` with `update()`,
   which a stock `User` model (whose `$fillable` is name, email and password)
-  silently ignores, so the page went straight back to the initials. The same
-  went for Remove. Both now use `forceFill()`. This dates from 0.1. Existing
-  apps need the new profile view:
-  `php artisan ui-kit:install-module profile --force`.
+  silently ignores, so the page went straight back to the initials. Remove
+  had the same bug. Both now use `forceFill()`. This dates from 0.1; existing
+  apps need the new profile view.
 - **Dark mode switched off after any `wire:navigate` page change**, including
   the redirect from the login form to the two-factor challenge: Livewire
-  copies the next page's `<html>` attributes over the current one and does
-  not re-run the head snippet. The theme store now re-applies the theme on
-  every swap, before paint. Existing apps need the new `resources/js/ui-kit.js`
-  (`php artisan vendor:publish --tag=ui-kit-assets --force`) and an asset
-  build.
+  copies the next page's `<html>` attributes over the current one and does not
+  re-run the head snippet. The theme store now re-applies the theme on every
+  swap, before paint. Existing apps need the new `resources/js/ui-kit.js` and
+  an asset build.
+- **Every `ds::button` inside a Livewire component showed a stray `>` before
+  its label** ("> Sign in", with the `>` in its accessible name) on
+  blade-ui 1.1: Livewire placed one of its `<!--[if BLOCK]>` markers inside
+  the real button tag. Fixed in blade-ui 1.2.0, which 0.4 requires; the page
+  tests now fail if a Livewire marker ever lands inside a tag again.
 - After Save photo or Cancel, the drop zone still listed the file just saved
   or discarded. It now resets.
+- The installer's closing checklist printed the layout tags as `&lt;head&gt;`
+  and the build command as `npm install &amp;&amp; npm run dev`. It prints
+  `<head>` and `&&` now.
 - `ui-kit:install` and `ui-kit:install-module` no longer fail with
   `Undefined constant STDIN` when run outside a CLI script, such as through
   `Artisan::call()` in a web request. Without a STDIN they treat the session
@@ -184,18 +183,114 @@ are all built on it.
 
 ### Removed
 
-- `resources/css/ui-kit-theme.css` and its `@theme` block: the `brand-*`
-  palette and the Poppins (`font-boldtext`) and Montserrat (`font-booktext`)
-  font utilities. The layouts load only Inter.
+- `resources/css/ui-kit-theme.css` and its `@theme` block (the `brand-*`
+  palette, `font-boldtext`, `font-booktext`).
 - The kit's own `@custom-variant dark`, `[x-cloak]` and `.safe-area-bottom`
   rules. The design system's `theme.css` provides all three.
-- The `layouts/partials/nav-icons` partial and its hand-drawn icons.
+- The `layouts/partials/nav-icons` partial.
 - The `accent-color` rule for native checkboxes and radios in `ui-kit.css`.
   The kit has no native ones left, and the design system's controls paint
   themselves.
 - The profile module's `<x-modal>` component
   (`resources/views/components/modal.blade.php`). Nothing in the kit uses it
   now; an app that used it in its own views keeps its published copy.
+
+### Upgrading from 0.3
+
+The same steps as "0.3 to 0.4" on
+[shipbytes.dev/docs/laravel-ui-kit/upgrading](https://shipbytes.dev/docs/laravel-ui-kit/upgrading).
+
+1. Start from a clean working tree (`git status` shows nothing). Step 3
+   overwrites files your app owns, and step 4 uses `git diff` to get your
+   changes back.
+2. Require the new minor. `^0.3` never picks up 0.4, and `-W` lets Composer
+   add `shipbytes/blade-ui`:
+
+   ```bash
+   composer require shipbytes/laravel-ui-kit:^0.4 -W
+   ```
+
+3. Re-run the installer in update mode with `--force`, naming every module
+   `ui-kit:list-modules` shows as installed (`--modules=all` if that is all
+   seven). A module left out drops out of `installed_modules`.
+
+   ```bash
+   php artisan ui-kit:list-modules
+   php artisan ui-kit:install --force --modules=admin-middleware,support-tickets,changelog,contacts,profile,impersonation,activity-log
+   ```
+
+   It re-publishes `config/ui-kit.php`, `config/admin.php`, the route files,
+   every view and layout, the Livewire classes, the module models and
+   factories, `resources/css/ui-kit.css` and `resources/js/ui-kit.js`, then
+   re-applies every module's routes, nav entries and middleware swap between
+   the markers and records the modules again. That replaces the kit's nav
+   icon names, puts the pagination trait in the admin lists, and deletes the
+   skeleton's Instrument Sans block from `app.css`. Migrations that already
+   exist are not published again, and the database is only migrated forward.
+4. Read `git diff` and bring back what was yours: entries you added to
+   `config/admin.php` outside the `ui-kit:nav` markers, values you changed in
+   `config/ui-kit.php` (brand, copy, features), and edits to views, Livewire
+   classes or models. Re-apply view edits to the new markup rather than
+   restoring the old file: the 0.3 markup uses classes that no longer exist.
+5. Delete the 0.3 theme file and the old icon partial, which nothing uses now:
+
+   ```bash
+   rm resources/css/ui-kit-theme.css resources/views/layouts/partials/nav-icons.blade.php
+   ```
+
+6. If you changed tokens in `ui-kit-theme.css`, move them into
+   `resources/css/app.css`, after the `ui-kit.css` import, as design-system
+   tokens:
+
+   ```diff
+    @import 'tailwindcss';
+    @import './ui-kit.css';
+   +
+   +:root { --ds-accent: #0d9488; --ds-accent-hover: #0f766e; }
+   +.dark { --ds-accent: #2dd4bf; --ds-accent-hover: #5eead4; }
+   ```
+
+7. Rename the icons of your own nav entries to Heroicons v2 names:
+   `grid` → `squares-2x2`, `note` → `document-text`, `chart` → `chart-bar`,
+   `history` → `clock` (`mail` still works; `envelope` is its real name).
+
+   ```diff
+   -['label' => 'Reports', 'route' => 'admin.reports', 'icon' => 'chart'],
+   +['label' => 'Reports', 'route' => 'admin.reports', 'icon' => 'chart-bar'],
+   ```
+
+8. In your own views, replace `brand-*`, `font-boldtext` and `font-booktext`
+   classes with design-system tokens and components. Your own Livewire lists
+   can use `WithDesignSystemPagination` in place of `WithPagination`. A layout
+   of your own that should look like the kit's needs `<x-ui-kit::head />` and
+   Inter in its `<head>`:
+
+   ```blade
+   <link rel="preconnect" href="https://fonts.bunny.net">
+   <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
+   ```
+
+9. Build the assets:
+
+   ```bash
+   npm run build
+   ```
+
+10. Check the result:
+
+    ```bash
+    php artisan ui-kit:doctor
+    ```
+
+    Every row passes; `mail from address configured` stays a skip until
+    `MAIL_FROM_ADDRESS` is set.
+
+### Known
+
+- A submit button with `wire:loading.attr="disabled"` drops keyboard focus to
+  `<body>` while its request runs, because the browser moves focus off a
+  control that becomes disabled. Keyboard users tab from the top of the page
+  again after submitting a form. Not fixed in 0.4.0.
 
 ## [0.3.0] - 2026-10-22
 
