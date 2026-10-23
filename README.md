@@ -1,3 +1,12 @@
+<p>
+  <a href="https://shipbytes.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/images/shipbytes-dark.svg">
+      <img src="docs/images/shipbytes-light.svg" alt="Shipbytes" width="184" height="36">
+    </picture>
+  </a>
+</p>
+
 # Laravel UI Kit
 
 Admin panel + auth UI scaffolding for **Laravel 12+** with Livewire 4, Fortify, and **Tailwind CSS v4**.
