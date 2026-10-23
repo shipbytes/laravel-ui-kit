@@ -7,6 +7,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Shipbytes\UiKit\Console\Concerns\InstallsModule;
 use Shipbytes\UiKit\Support\ModuleRegistry;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
@@ -104,12 +105,16 @@ class InstallCommand extends Command
         }
 
         $this->line("  <fg=yellow>{$step}.</> Add the kit's component tags to your master layout (<info>resources/views/layouts/app.blade.php</info>):");
-        $this->line('       <fg=gray>&lt;head&gt;</>');
-        $this->line('       <fg=gray>    &lt;x-ui-kit::head /&gt;       <!-- dark-mode no-flash --&gt;</>');
-        $this->line('       <fg=gray>&lt;/head&gt;</>');
-        $this->line('       <fg=gray>&lt;body&gt;</>');
-        $this->line('       <fg=gray>    &lt;x-ui-kit::banners /&gt;    <!-- impersonation ribbon --&gt;</>');
-        $this->line('       <fg=gray>&lt;/body&gt;</>');
+        foreach ([
+            '<head>',
+            '    <x-ui-kit::head />       <!-- dark-mode no-flash -->',
+            '</head>',
+            '<body>',
+            '    <x-ui-kit::banners />    <!-- impersonation ribbon -->',
+            '</body>',
+        ] as $html) {
+            $this->line('       <fg=gray>'.OutputFormatter::escape($html).'</>');
+        }
         $this->newLine();
         $step++;
 
@@ -119,7 +124,7 @@ class InstallCommand extends Command
         $step++;
 
         $this->line("  <fg=yellow>{$step}.</> Build assets:");
-        $this->line('       <fg=gray>npm install &amp;&amp; npm run dev</>');
+        $this->line('       <fg=gray>npm install && npm run dev</>');
         $this->newLine();
         $step++;
 

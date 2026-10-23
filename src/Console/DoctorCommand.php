@@ -214,8 +214,10 @@ class DoctorCommand extends Command
      * 0.4 moved the kit onto the Shipbytes design system. An app upgraded from
      * 0.3 keeps its old ui-kit.css, which imports the kit's own theme file and
      * never reaches the design system's tokens, and its custom nav entries
-     * keep icon names from the old partial. Neither throws: the first renders
-     * unstyled components, the second renders a nav row without an icon.
+     * keep icon names from the old partial. The first throws nothing and
+     * renders unstyled components; the second makes every admin page fail,
+     * since ds::icon cannot find heroicon-o-<name> and the sidebar is on all
+     * of them, with an error that never mentions config/admin.php.
      */
     protected function checkDesignSystem(): void
     {
