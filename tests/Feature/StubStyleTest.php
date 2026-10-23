@@ -17,22 +17,6 @@ use PHPUnit\Framework\TestCase;
  */
 class StubStyleTest extends TestCase
 {
-    /**
-     * Screens not yet moved onto the design system. Phases 3 and 4 of the
-     * 0.4.0 series empty this list; nothing should ever be added back to it.
-     */
-    private const NOT_YET_MIGRATED = [
-        'stubs/core/views/livewire/admin/dashboard.blade.php',
-        'stubs/core/views/livewire/admin/users/user-detail.blade.php',
-        'stubs/core/views/livewire/admin/users/user-list.blade.php',
-        'stubs/modules/activity-log/views/livewire/admin/activity/activity-viewer.blade.php',
-        'stubs/modules/changelog/views/livewire/admin/changelog/changelog-form.blade.php',
-        'stubs/modules/changelog/views/livewire/admin/changelog/changelog-list.blade.php',
-        'stubs/modules/contacts/views/livewire/admin/contacts/contact-list.blade.php',
-        'stubs/modules/support-tickets/views/livewire/admin/support/ticket-detail.blade.php',
-        'stubs/modules/support-tickets/views/livewire/admin/support/ticket-list.blade.php',
-    ];
-
     /** @var array<string, string> rule => pattern */
     private const RULES = [
         'palette utility' => '/\b(?:bg|text|ring|border|from|via|to|fill|stroke|outline|shadow|decoration|placeholder|divide|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/',
@@ -42,6 +26,9 @@ class StubStyleTest extends TestCase
         'raw <input>' => '/<input\b(?![^>]*\btype\s*=\s*["\']hidden["\'])/i',
         'raw <select>' => '/<select\b/i',
         'raw <textarea>' => '/<textarea\b/i',
+        // The design system's controls paint themselves; a native accent-color
+        // was the stopgap for the raw checkboxes this kit no longer has.
+        'accent-color' => '/\baccent-color\s*:/i',
     ];
 
     public function test_stubs_are_built_on_the_design_system(): void
@@ -49,10 +36,6 @@ class StubStyleTest extends TestCase
         $offenders = [];
 
         foreach ($this->stubs() as $relative => $path) {
-            if (in_array($relative, self::NOT_YET_MIGRATED, true)) {
-                continue;
-            }
-
             // Matched against the whole file, not line by line, so a tag whose
             // attributes span several lines (<input … type="hidden">) is read whole.
             $contents = (string) file_get_contents($path);
@@ -79,16 +62,6 @@ class StubStyleTest extends TestCase
             ."\n\nUse a ds:: component or a semantic token (bg-surface, text-fg-muted, border-border…). If the design system cannot express it, report the gap upstream.");
     }
 
-    public function test_the_not_yet_migrated_list_does_not_rot(): void
-    {
-        $missing = array_values(array_filter(
-            self::NOT_YET_MIGRATED,
-            fn (string $relative) => ! is_file($this->root().'/'.$relative)
-        ));
-
-        $this->assertSame([], $missing, 'Allowlisted stubs that no longer exist; remove them from StubStyleTest::NOT_YET_MIGRATED.');
-    }
-
     public function test_the_rules_catch_what_they_claim_to(): void
     {
         $bad = [
@@ -99,6 +72,7 @@ class StubStyleTest extends TestCase
             'raw <input>' => '<input type="text" name="q">',
             'raw <select>' => '<select name="role">',
             'raw <textarea>' => '<textarea name="body">',
+            'accent-color' => "input[type='checkbox'] { accent-color: var(--ds-accent); }",
         ];
 
         foreach ($bad as $rule => $line) {
@@ -117,7 +91,7 @@ class StubStyleTest extends TestCase
         }
     }
 
-    /** @return array<string, string> repo-relative path => absolute path */
+    /** @return array<string, string> repo-relative path => absolute path, every Blade and CSS stub */
     private function stubs(): array
     {
         $root = $this->root();
@@ -126,14 +100,14 @@ class StubStyleTest extends TestCase
 
         foreach ($files as $file) {
             /** @var \SplFileInfo $file */
-            if (str_ends_with($file->getFilename(), '.blade.php')) {
+            if (str_ends_with($file->getFilename(), '.blade.php') || str_ends_with($file->getFilename(), '.css')) {
                 $stubs[str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1))] = $file->getPathname();
             }
         }
 
         ksort($stubs);
 
-        $this->assertNotEmpty($stubs, 'No Blade stubs found; is the stubs/ path right?');
+        $this->assertNotEmpty($stubs, 'No stubs found; is the stubs/ path right?');
 
         return $stubs;
     }

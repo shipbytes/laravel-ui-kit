@@ -4,11 +4,11 @@ namespace App\Livewire\Admin\Changelog;
 
 use App\Models\ChangelogEntry;
 use Livewire\Component;
-use Livewire\WithPagination;
+use Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination;
 
 class ChangelogList extends Component
 {
-    use WithPagination;
+    use WithDesignSystemPagination;
 
     public string $search = '';
 

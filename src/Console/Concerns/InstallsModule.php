@@ -52,6 +52,10 @@ trait InstallsModule
         $shouldFallback = PHP_OS_FAMILY === 'Windows'
             || getenv('WSL_DISTRO_NAME') !== false
             || getenv('WSL_INTEROP') !== false
+            // STDIN is only defined for a CLI script read from a file: not
+            // under php-fpm (Artisan::call from a request) and not for code
+            // piped to php, which is how PHPUnit 11 runs an isolated test.
+            || ! defined('STDIN')
             || ! stream_isatty(STDIN);
 
         Prompt::fallbackWhen($shouldFallback);

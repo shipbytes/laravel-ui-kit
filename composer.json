@@ -25,13 +25,15 @@
         "laravel/prompts": "^0.3.0",
         "livewire/livewire": "^4.4",
         "propaganistas/laravel-disposable-email": "^2.4",
-        "shipbytes/blade-ui": "^1.2"
+        "shipbytes/blade-ui": "^1.2.2"
     },
     "require-dev": {
         "larastan/larastan": "^3.10",
         "laravel/pint": "^1.30",
+        "mews/purifier": "^3.4",
         "orchestra/testbench": "^10.0 || ^11.0",
-        "phpunit/phpunit": "^11.5 || ^12.0"
+        "phpunit/phpunit": "^11.5 || ^12.0",
+        "spatie/laravel-activitylog": "^4.10"
     },
     "suggest": {
         "spatie/laravel-permission": "Required when installing the admin-middleware module",

@@ -35,4 +35,17 @@ class ContactSubmission extends Model
     {
         return $query->whereNotNull('archived_at');
     }
+
+    /**
+     * The badge tone for the status, from the design system's five. Kept here
+     * so the table row and the open message cannot drift apart.
+     */
+    public function statusTone(): string
+    {
+        return match ($this->status) {
+            'unread' => 'accent',
+            'replied' => 'success',
+            default => 'neutral',
+        };
+    }
 }

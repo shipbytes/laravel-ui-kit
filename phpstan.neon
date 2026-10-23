@@ -15,3 +15,8 @@ parameters:
             paths:
                 - src/View/Components/UiKitBanners.php
                 - src/View/Components/UiKitHead.php
+        # Published Livewire components use it; they live in stubs/, which
+        # this analysis does not read (see above).
+        -
+            identifier: trait.unused
+            path: src/Livewire/Concerns/WithDesignSystemPagination.php

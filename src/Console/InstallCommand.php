@@ -443,7 +443,7 @@ class InstallCommand extends Command
         $this->line('Type comma-separated numbers to install (e.g. <info>1,3,5</info>), <info>all</info> for everything, or press <info>Enter</info> to install core only.');
         $this->output->write('> ');
 
-        $line = fgets(STDIN);
+        $line = defined('STDIN') ? fgets(STDIN) : false;
 
         if ($line === false) {
             return [];

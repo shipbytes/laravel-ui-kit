@@ -6,13 +6,13 @@ use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
+use Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination;
 use Spatie\Activitylog\Models\Activity;
 
 #[Layout('layouts.admin-sidebar')]
 class ActivityViewer extends Component
 {
-    use WithPagination;
+    use WithDesignSystemPagination;
 
     #[Url(as: 'log')]
     public string $logName = '';
