@@ -54,7 +54,10 @@ end of this entry lists the steps.
   (Contacts) and `clock` (Activity). Of the 0.3 names, `grid`, `note`, `chart`
   and `history` no longer resolve (use `squares-2x2`, `document-text`,
   `chart-bar`, `clock`); `mail` still works through a design-system alias of
-  `envelope`; `users`, `ticket`, `clock` and `user-circle` are unchanged. The
+  `envelope`; `users`, `ticket`, `clock` and `user-circle` are unchanged. A
+  name that does not resolve makes every admin page fail with `Unable to
+  locate a class or view for component [heroicon-o-…]`, because the sidebar
+  renders on every page; `ui-kit:doctor` names each one. The
   `layouts/partials/nav-icons` partial and its hand-drawn SVGs are gone.
 - **`ui-kit.css` now carries two `@source` lines**: the design system's views,
   and the kit's own package views in `vendor/` (`<x-ui-kit::page-header>` and
@@ -253,14 +256,18 @@ The same steps as "0.3 to 0.4" on
 7. Rename the icons of your own nav entries to Heroicons v2 names:
    `grid` → `squares-2x2`, `note` → `document-text`, `chart` → `chart-bar`,
    `history` → `clock` (`mail` still works; `envelope` is its real name).
+   Until you do, an entry with a 0.3 name makes every admin page fail with
+   `Unable to locate a class or view for component [heroicon-o-…]`. The
+   doctor's `nav icons are Heroicons` row names each one.
 
    ```diff
    -['label' => 'Reports', 'route' => 'admin.reports', 'icon' => 'chart'],
    +['label' => 'Reports', 'route' => 'admin.reports', 'icon' => 'chart-bar'],
    ```
 
-8. In your own views, replace `brand-*`, `font-boldtext` and `font-booktext`
-   classes with design-system tokens and components. Your own Livewire lists
+8. In your own views, replace `brand-*` classes with design-system token
+   classes such as `bg-accent` and `text-accent`, and `font-boldtext` or
+   `font-booktext` with `font-semibold` or nothing. Your own Livewire lists
    can use `WithDesignSystemPagination` in place of `WithPagination`. A layout
    of your own that should look like the kit's needs `<x-ui-kit::head />` and
    Inter in its `<head>`:
