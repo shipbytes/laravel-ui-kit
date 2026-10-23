@@ -2,15 +2,16 @@
 
 namespace Shipbytes\UiKit\Tests\Fixtures;
 
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 /**
- * A Laravel 13 style model hiding the two-factor columns through the
- * attribute, for the doctor's hidden-columns row.
+ * A user model hiding the two-factor columns, for the doctor's hidden-columns
+ * row. A $hidden property, not Laravel 13's #[Hidden] attribute: Laravel 12
+ * has no such attribute and would hide nothing.
  */
-#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class HidesTwoFactorUser extends Authenticatable
 {
     protected $table = 'users';
+
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 }
