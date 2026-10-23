@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [main, master, staging, v0.1-l12-reset]
+    branches: [main, master, staging, v0.1-l12-reset, design-system]
   pull_request:
-    branches: [main, master, staging]
+    branches: [main, master, staging, design-system]
 
 jobs:
   lint:

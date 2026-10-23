@@ -10,13 +10,14 @@ Core + 7 optional modules, installed by a turnkey `php artisan ui-kit:install`. 
 
 ### Always installed (core)
 
-- **Auth pages** — login, register, forgot/reset password, email verification, confirm password, and a **two-factor challenge** page (Livewire 4 single-file components + Fortify), all with dark-mode variants
+- **Auth pages** — login, register, forgot/reset password, email verification, confirm password, and a **two-factor challenge** page (Livewire 4 single-file components + Fortify), light and dark
 - **Working 2FA** — the login flow stages a TOTP/recovery-code challenge for users who enabled two-factor auth (enable/confirm UI ships with the `profile` module)
-- **Admin shell** — collapsible sidebar, mobile bottom nav, theme toggle, current-user footer with profile link + logout; nav is config-driven from `config/admin.php`
+- **Admin shell** — collapsible sidebar, mobile bottom nav with a "More" sheet, theme toggle, current-user footer with profile link + logout; nav is config-driven from `config/admin.php` with Heroicons v2 icon names
 - **User shell** — a light authenticated layout (`layouts/user-shell`) used by user-facing pages like `/profile`
-- **Dashboard stub + Users list/detail**
-- **Tailwind v4 theme** — CSS-first `@theme` tokens (brand palette, Inter/Poppins/Montserrat font utilities) and a class-strategy `dark:` variant
-- **Alpine stores** — sidebar collapse (localStorage-persisted), theme toggle with no-flash snippet
+- **Dashboard stub + Users list/detail** — stat tiles, a searchable table, and the `<x-ui-kit::page-header>` component every admin screen opens with
+- **Built on the Shipbytes design system** — every view uses [`shipbytes/blade-ui`](https://shipbytes.dev/docs/design-system) (`ds::` Blade components, semantic tokens that switch for dark mode on their own, Heroicons v2, Inter); it comes with the kit, so there's no separate install step
+- **`WithDesignSystemPagination`** — a Livewire trait that pages any list with the design system's pagination, keeping its search and filters
+- **Alpine stores** — sidebar collapse (localStorage-persisted), theme toggle with no-flash snippet (follows the OS until the user picks a theme)
 - **`ui-kit:doctor`** — a health check that verifies the install is fully wired
 
 ### Optional modules
@@ -37,7 +38,8 @@ Modules that ship models also ship **factories**, so `SupportTicket::factory()` 
 
 - PHP 8.2+
 - Laravel 12 (Laravel 13 supported in composer constraints; CI leg is experimental)
-- Livewire 4.4+ (installed with the kit; Volt is no longer used)
+- Livewire 4.4+ (installed with the kit)
+- `shipbytes/blade-ui` ^1.2.2, the design system (installed with the kit)
 - Tailwind CSS v4 (the default in fresh Laravel 12 apps)
 - Node 18+ (for the Vite build)
 
@@ -56,7 +58,7 @@ When the Laravel installer prompts you:
 | Prompt | Pick | Why |
 | --- | --- | --- |
 | Starter kit | **None** | The kit *is* the auth/admin scaffolding — every starter kit (Breeze-style Livewire, React, Vue) collides with it. |
-| Frontend stack | **Blade** | Gives you plain Vite + Tailwind CSS v4, which the kit's `@theme` file plugs straight into. Livewire 4 arrives via Composer with the kit itself. |
+| Frontend stack | **Blade** | Gives you plain Vite + Tailwind CSS v4, which the kit's stylesheet (and the design system it imports) plugs straight into. Livewire 4 arrives via Composer with the kit itself. |
 | Testing framework | Pest or PHPUnit | No interaction with the kit — pick your preference. |
 | Database | Any (the SQLite default is fine) | The kit's migrations run on anything Laravel supports. |
 | Run `npm install` / migrations | Yes | The kit's Vite wiring expects `resources/css/app.css` and `resources/js/app.js` to exist, and its installer migrates on top of the base tables. |
@@ -136,7 +138,7 @@ composer update shipbytes/laravel-ui-kit
 - Publishes every kit + dependency config, view, class, route file, and migration
 - Patches `config/fortify.php` (`views=false`, `home=/`, passkeys feature off) and publishes Fortify's 2FA columns migration
 - Patches `config/admin.php` nav and `routes/admin.php` / `routes/ui-kit-user.php` between `/* ui-kit:* */` markers — **idempotently**, and without wiping other modules' entries
-- **Wires your Vite entrypoints**: adds `@import './ui-kit.css';` to `resources/css/app.css` and `import './ui-kit';` to `resources/js/app.js`
+- **Wires your Vite entrypoints**: adds `@import './ui-kit.css';` to `resources/css/app.css` and `import './ui-kit';` to `resources/js/app.js`, and deletes the skeleton's Instrument Sans `--font-sans` from `app.css` (see [Finish wiring](#finish-wiring-the-irreducible-checklist))
 - Runs `vendor:publish` for every dependent package, one `php artisan migrate`, seeds the admin role, runs `storage:link`
 - Generates `app/Models/Concerns/UiKitUser.php` bundling exactly the traits your chosen modules need (Spatie `HasRoles`, lab404 `Impersonate`, Fortify `TwoFactorAuthenticatable`) — **and applies it to `app/Models/User.php` automatically** (the patch is lint-checked and reverted if it would break the file; you only edit by hand if the installer says so)
 - Auto-loads `routes/auth.php`, `routes/admin.php`, `routes/ui-kit-user.php` from the service provider — no `bootstrap/app.php` edit
@@ -163,23 +165,73 @@ composer update shipbytes/laravel-ui-kit
    `admin-middleware` module is installed and sets the `is_admin` flag when the
    column exists — whichever mechanisms are present.
 
-3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table (published files, Livewire 4 migration (Livewire version, `Route::livewire` in routes/auth.php, no Volt imports in views, no Volt service provider), Fortify flags, Vite imports, trait applied, storage link, 2FA columns, duplicate route names, mail config).
+3. **Verify:** `php artisan ui-kit:doctor` prints a ✓/✗ table: published files,
+   the Livewire 4 setup, Fortify flags, Vite imports, the design system
+   (package installed, `ui-kit.css` imports it and scans the kit's views, no
+   leftover 0.3 theme file, no font override in `app.css`, nav icons resolve,
+   admin lists use the design system's pagination), trait applied, storage
+   link, 2FA columns, duplicate route names and mail config. Every failing row
+   says how to fix it.
 
 > The `UiKitUser` trait used to be a manual step here — the installer now
 > applies it to `app/Models/User.php` itself and only asks you to do it by
 > hand if the patch fails (custom model location, unrecognized class layout).
 
-If your app has its own master layout for public pages, drop the kit's head/banner components into it so dark-mode no-flash and the impersonation ribbon work there too:
+#### What the CSS ends up as
+
+After the install a fresh Laravel 12 app's `resources/css/app.css` is the
+skeleton's file with one line added and one block removed:
+
+```diff
+ @import 'tailwindcss';
++@import './ui-kit.css';
+
+ @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+ @source '../../storage/framework/views/*.php';
+ @source '../**/*.blade.php';
+ @source '../**/*.js';
+-
+-@theme {
+-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+-        'Segoe UI Symbol', 'Noto Color Emoji';
+-}
+```
+
+The skeleton's `@theme` block came after the kit's import, so it beat the
+design system's Inter, and since nothing loads Instrument Sans the app rendered
+in the system font. The installer deletes only that declaration; a font you set
+yourself is left alone (and the doctor reminds you to load it).
+
+The published `resources/css/ui-kit.css` holds the design system's three-line
+contract plus the kit's own views:
+
+```css
+@import '../../vendor/shipbytes/blade-ui/dist/tokens.css';
+@import '../../vendor/shipbytes/blade-ui/dist/theme.css';
+@source '../../vendor/shipbytes/blade-ui/resources/views';
+@source '../../vendor/shipbytes/laravel-ui-kit/resources/views';
+```
+
+Keep both `@source` lines: Tailwind doesn't scan `vendor/`, so without them the
+`ds::` components and the kit's page header render unstyled and nothing reports
+an error.
+
+#### Your own layouts
+
+The kit's three layouts (guest, admin, user shell) load Inter and include the
+kit's head and banner components. A master layout of your own for public pages
+needs the same in its `<head>` and `<body>` to match, keep dark mode flash-free
+and show the impersonation ribbon:
 
 ```blade
 <head>
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
     <x-ui-kit::head />
 </head>
 <body>
     <x-ui-kit::banners />
 ```
-
-(The kit's own layouts — guest, admin, user shell — already include them.)
 
 ## Configuration
 
@@ -194,27 +246,42 @@ If your app has its own master layout for public pages, drop the kit's head/bann
 ],
 ```
 
-Drop a logo at `public/images/logo.png` (or point `UI_KIT_BRAND_LOGO` anywhere, including a full URL). Until a logo exists the layouts render an initial badge, so nothing looks broken on a fresh install. `home_route` names the route used for "back to site" links and post-login redirects — **when the route doesn't exist the kit falls back to `/`**, so fresh apps work without defining one.
+Drop a logo at `public/images/logo.png` (or point `UI_KIT_BRAND_LOGO` anywhere, including a full URL). Until a logo exists the layouts render an initial badge in the accent colour, so nothing looks broken on a fresh install. Brand *colours* are design-system tokens; see the next section. `home_route` names the route used for "back to site" links and post-login redirects — **when the route doesn't exist the kit falls back to `/`**, so fresh apps work without defining one.
 
-### Tailwind theme
+### Design system
 
-The design tokens live in `resources/css/ui-kit-theme.css` (Tailwind v4 `@theme`):
+The kit's views are built on the [Shipbytes design system](https://shipbytes.dev/docs/design-system)
+(`shipbytes/blade-ui`): `ds::` Blade components and semantic tokens such as
+`bg-surface`, `text-fg-muted` and `border-border`. Composer installs it with the
+kit, and `resources/css/ui-kit.css` wires it in (see
+[What the CSS ends up as](#what-the-css-ends-up-as)). The accent is the design
+system's blue and the font is Inter.
+
+To change a token (the accent colour, say), redefine its `--ds-*` variable in
+`app.css` **after** the `ui-kit.css` import, once for light and once for dark:
 
 ```css
-@theme {
-    --color-brand-500: #6366f1;   /* bg-brand-500, text-brand-600, … */
-    --font-boldtext: 'Poppins', ui-sans-serif, system-ui, sans-serif;
-}
+@import './ui-kit.css';
+
+:root { --ds-accent: #0d9488; --ds-accent-hover: #0f766e; }
+.dark { --ds-accent: #2dd4bf; --ds-accent-hover: #5eead4; }
 ```
 
-Override any token in your own CSS after the import — last definition wins. Dark mode uses a `dark` class on `<html>` (toggled by `<x-theme-toggle />`, persisted to localStorage, no-flash on load).
+The design system's docs list every token and component. Your own views use the
+same `ds::` components and token classes; the kit's stubs are working examples.
+
+**Dark mode** is a `light` or `dark` class on `<html>`. Exactly one is always
+set: `<x-ui-kit::head />` sets it before first paint and the theme store keeps
+it across `wire:navigate` page changes. Until the user picks a theme with
+`<x-theme-toggle />` it follows the OS setting; picking one stores it in
+localStorage as `ui-kit.theme`.
 
 ### Sidebar navigation
 
 ```php
 // config/admin.php
 'nav' => [
-    ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'grid'],
+    ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'squares-2x2'],
     ['label' => 'Users', 'route' => 'admin.users.index', 'icon' => 'users'],
     ['section' => 'Support'],
     ['label' => 'Tickets', 'route' => 'admin.support.index', 'icon' => 'ticket', 'badge' => 'open_tickets'],
@@ -222,6 +289,32 @@ Override any token in your own CSS after the import — last definition wins. Da
 ```
 
 Modules append their own entries automatically between the `/* ui-kit:nav-* */` markers.
+`icon` is a [Heroicons v2](https://heroicons.com) outline name (`squares-2x2`, `document-text`, `envelope`, `chart-bar`…), rendered through `ds::icon`; any icon on heroicons.com works, and `ui-kit:doctor` flags a name that doesn't resolve.
+
+### Your own admin screens
+
+Open them with the kit's page header, and page their lists with the design system:
+
+```blade
+<x-ui-kit::page-header title="Reports" subtitle="Monthly figures.">
+    <x-slot:actions>
+        <x-ds::button :href="route('admin.reports.export')">Export</x-ds::button>
+    </x-slot:actions>
+</x-ui-kit::page-header>
+```
+
+```php
+use Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination;
+
+class ReportList extends Component
+{
+    use WithDesignSystemPagination;   // in place of WithPagination
+}
+```
+
+The trait renders the design system's Livewire pagination, so a page change is a
+Livewire update that keeps the component's search and filters. A component that
+defines its own `paginationView()` keeps it.
 
 ### Sidebar badges
 
@@ -267,22 +360,22 @@ Re-running `ui-kit:install` is safe: it detects the existing install, keeps your
 Ships `EnsureUserIsAdmin` (Spatie role check) + `AdminRoleSeeder`. The installer publishes Spatie's config/migrations, migrates, seeds the `admin`/`user` roles, and swaps the middleware in `config/admin.php` from the `is_admin` fallback to the role check. The `UiKitUser` trait (with `HasRoles`) is applied to your User model automatically; grant the role with `php artisan ui-kit:make-admin you@example.com`.
 
 ### `support-tickets`
-Admin-only queue (the public form is yours to build). Search by name/email, filter by status/priority/category, inline replies, open-count badge. Status/priority changes are validated server-side. Mailables are intentionally omitted so you plug in your own notification flow.
+Admin-only queue (the public form is yours to build). The list opens with four stat tiles (total, open, in progress, resolved), then a search field and status/priority/category filters over a table (Subject, From, Status, Priority, Category, Updated) with badge tones from `SupportTicket::statusTone()` / `priorityTone()`, and Livewire pagination. A ticket shows the thread, an inline reply, and Status and Priority selects in one labelled panel, validated server-side. Mailables are intentionally omitted so you plug in your own notification flow.
 
 ### `changelog`
-Admin CRUD + `ChangelogEntry::published()` scope for a public feed. HTML is sanitized via `mews/purifier`. For a public page, add a route rendering your own view over the `published()` scope (the module ships only the admin side).
+Admin CRUD + `ChangelogEntry::published()` scope for a public feed. The list is a table with a title search, a category filter, category badges (`ChangelogEntry::categoryTone()`) and Published/Draft badges; the form's Published toggle is a `ds::switch` saved with the rest of the form. HTML is sanitized via `mews/purifier`. For a public page, add a route rendering your own view over the `published()` scope (the module ships only the admin side).
 
 ### `contacts`
-Inbox for a public contact form that writes to `contact_submissions`. Read/unread, archive, bulk actions, reply drafts (bring your own Mailable). When `support-tickets` is also installed, a **Copy to Ticket** button appears automatically.
+Inbox for a public contact form that writes to `contact_submissions`. Stat tiles (total, unread, replied, archived), a search field and a status filter over a table with a select column; selecting rows shows a bulk bar (Mark read, Mark unread, Archive, Delete). A message opens in a `ds::modal` with its reply draft (bring your own Mailable). Archiving sets `archived_at`; archived messages leave the inbox and show under the Archived filter. When `support-tickets` is also installed, a **Copy to Ticket** button appears automatically.
 
 ### `profile`
-Cards under `/profile` (rendered in the user shell, not the admin shell): update info + avatar, update password, two-factor authentication, delete account. Avatars are stored under a content-derived extension and resized to 200×200 when `intervention/image` is installed.
+Cards under `/profile` (rendered in the user shell, not the admin shell): update info + avatar, update password, two-factor authentication, delete account. The avatar is a round `ds::avatar` (initials until a photo exists) beside a `ds::file-upload` drop zone with Save photo, Cancel and Remove; deleting the account confirms the password in a `ds::modal`. Avatars are stored under a content-derived extension and resized to 200×200 when `intervention/image` is installed. The profile stores `avatar_path` with `forceFill()`, so a stock `User` model's `$fillable` doesn't need changing.
 
 ### `impersonation`
 Two Blade partials over `lab404/laravel-impersonate`. The package ships its routes as a macro; the installer calls it for you by adding `Route::impersonate();` to `routes/ui-kit-user.php` (web + auth), which registers `impersonate` and `impersonate.leave`. `ui-kit:doctor` checks both routes exist. `<x-ui-kit::banners />` shows the exit ribbon automatically; `@include('partials.impersonation-button', ['user' => $user])` renders the login-as button. The generated `UiKitUser` trait provides `canImpersonate()` / `canBeImpersonated()`.
 
 ### `activity-log`
-Paginated admin viewer over `spatie/laravel-activitylog`. Filters: log stream, causer email, date range. Add the `LogsActivity` trait to models you want logged (see Spatie's docs).
+Paginated admin viewer over `spatie/laravel-activitylog`: a table of when, who, event (with the log name as a small badge under it), subject and description, filtered by labelled log stream, user email and date range fields. Add the `LogsActivity` trait to models you want logged (see Spatie's docs).
 
 ## Environment reference
 
@@ -307,15 +400,13 @@ In local dev, `MAIL_MAILER=log` works — mail lands in `storage/logs/laravel.lo
 
 ## Troubleshooting
 
-Run `php artisan ui-kit:doctor` first — it catches the common ones and prints the fix.
+Run `php artisan ui-kit:doctor` first — it catches the common problems and prints the fix beside each failing row.
 
-- **`/login` returns 500 with "Vite manifest not found"** — run `npm run dev` or `npm run build`.
-- **Password reset / verification emails never arrive** — check `MAIL_*` in `.env`.
-- **"Unauthorized" on `/admin`** — the fallback middleware requires `$user->is_admin` to be truthy; with `admin-middleware` installed you need the `admin` role assigned.
-- **Sidebar badges show 0 / blank** — bind your own `SidebarBadgeResolver`; the default returns an empty array.
-- **`Class "Livewire\Volt\Volt" not found` or a leftover `VoltServiceProvider` after upgrading from 0.2** — finish the Livewire 4 migration: the doctor's Livewire rows print each step, and the Livewire 4 entry in `CHANGELOG.md` lists them.
-- **`route:cache` fails with a duplicate name** — the doctor lists the duplicates; usually a route file was copied without its `ui-kit:managed` header and loaded twice by hand.
-- **The welcome page's "Dashboard" button 404s** — that button is stock Laravel and links to `/dashboard`, which nothing registers. The kit's panel is at `/admin`; edit `resources/views/welcome.blade.php` to point there (or replace the page).
+Every known failure, with its symptom, cause and fix command, is on the site:
+**[shipbytes.dev/docs/laravel-ui-kit/troubleshooting](https://shipbytes.dev/docs/laravel-ui-kit/troubleshooting)**.
+Upgrading from an older minor is covered step by step on
+[shipbytes.dev/docs/laravel-ui-kit/upgrading](https://shipbytes.dev/docs/laravel-ui-kit/upgrading)
+and in [CHANGELOG.md](CHANGELOG.md).
 
 ## Testing the package
 

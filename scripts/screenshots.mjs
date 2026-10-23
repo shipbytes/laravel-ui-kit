@@ -4,7 +4,9 @@
  *
  * Builds a fresh Laravel 12 app with the kit and every module, seeds it with the data in
  * scripts/screenshots/ScreenshotSeeder.php, serves it, and photographs each screen in
- * light and dark mode at 1440 px wide, plus the admin shell on a phone.
+ * light and dark mode at 1440 px wide, plus the admin shell on a phone. The theme is chosen
+ * the way a user would: the stored `ui-kit.theme` choice, which puts the design system's
+ * `light` or `dark` class on <html>.
  *
  *   npm install && npm run screenshots              # creates .screenshots-app/ on first run
  *   npm run screenshots -- --app=/path/to/app       # reuse an app that already has the kit installed
@@ -130,6 +132,10 @@ async function shot(page, name, theme) {
   if (/Whoops|Illuminate\\|ErrorException|Vite manifest/.test(body ?? '')) {
     problems.push(`${name} (${theme}): the page shows an error`)
   }
+  // The head snippet and the theme store put exactly one of light / dark on <html>.
+  if (!(await page.evaluate((t) => document.documentElement.classList.contains(t), theme))) {
+    problems.push(`${name} (${theme}): <html> does not carry the "${theme}" class`)
+  }
   await page.screenshot({ path: file })
   written.push(file)
   console.log(`  ${(name + '-' + theme).padEnd(32)} ${page.url().replace(BASE, '')}`)
@@ -184,8 +190,9 @@ for (const theme of ['light', 'dark']) {
     await open(page, path)
     await shot(page, name, theme)
   }
-  await page.click('a[href*="/admin/support/"]')
-  await page.waitForURL('**/admin/support/*')
+  // Load the first ticket by its URL. Clicking its View link goes through
+  // wire:navigate, whose progress bar is still fading when the shot is taken.
+  await open(page, new URL(await page.getAttribute('a[href*="/admin/support/"]', 'href'), BASE).pathname)
   await shot(page, 'admin-support-ticket', theme)
   for (const [name, path] of [
     ['admin-changelog', '/admin/changelog'],

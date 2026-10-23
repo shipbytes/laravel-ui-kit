@@ -4,11 +4,11 @@ namespace App\Livewire\Admin\Support;
 
 use App\Models\SupportTicket;
 use Livewire\Component;
-use Livewire\WithPagination;
+use Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination;
 
 class TicketList extends Component
 {
-    use WithPagination;
+    use WithDesignSystemPagination;
 
     public string $statusFilter = 'all';
 

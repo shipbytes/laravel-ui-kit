@@ -65,10 +65,10 @@ class ScreenshotSeeder extends Seeder
             ['Cannot export the monthly report as CSV', 'bug', 'high', 'open'],
             ['Invoice PDF shows the wrong VAT rate', 'billing', 'high', 'open'],
             ['Add a dark mode to the customer portal', 'feature_request', 'low', 'open'],
-            ['Two-factor codes rejected after a phone change', 'general', 'medium', 'open'],
-            ['Webhook retries stop after three attempts', 'bug', 'medium', 'open'],
+            ['Two-factor codes rejected after a phone change', 'general', 'medium', 'in_progress'],
+            ['Webhook retries stop after three attempts', 'bug', 'medium', 'in_progress'],
             ['Request: SSO through Okta', 'feature_request', 'low', 'closed'],
-            ['Charged twice for the March renewal', 'billing', 'high', 'closed'],
+            ['Charged twice for the March renewal', 'billing', 'high', 'resolved'],
             ['Search ignores accented characters', 'bug', 'low', 'closed'],
         ];
         foreach ($tickets as $i => [$subject, $category, $priority, $status]) {
@@ -80,6 +80,7 @@ class ScreenshotSeeder extends Seeder
                 'status' => $status,
                 'closed_at' => $status === 'closed' ? now()->subDays($i) : null,
                 'created_at' => now()->subDays($i * 2 + 1),
+                'updated_at' => now()->subDays($i * 2)->subHours($i + 2),
             ]);
             TicketReply::factory()->create([
                 'ticket_id' => $ticket->id,
@@ -120,15 +121,16 @@ class ScreenshotSeeder extends Seeder
         ]);
 
         $contacts = [
-            ['Priya Natarajan', 'priya@example.com', 'Enterprise pricing', 'unread'],
-            ['Marcus Chen', 'marcus@example.com', 'Partnership proposal', 'unread'],
-            ['Elena Petrova', 'elena@example.com', 'Data residency in the EU', 'unread'],
-            ['Samuel Okafor', 'samuel@example.com', 'Press enquiry', 'read'],
-            ['Yuki Tanaka', 'yuki@example.com', 'Invoice copy for 2025', 'replied'],
-            ['Lucía Fernández', 'lucia@example.com', 'Accessibility statement', 'replied'],
-            ['Noah Williams', 'noah@example.com', 'Student discount', 'archived'],
+            ['Priya Natarajan', 'priya@example.com', 'Enterprise pricing', 'unread', false],
+            ['Marcus Chen', 'marcus@example.com', 'Partnership proposal', 'unread', false],
+            ['Elena Petrova', 'elena@example.com', 'Data residency in the EU', 'unread', false],
+            ['Samuel Okafor', 'samuel@example.com', 'Press enquiry', 'read', false],
+            ['Yuki Tanaka', 'yuki@example.com', 'Invoice copy for 2025', 'replied', false],
+            ['Lucía Fernández', 'lucia@example.com', 'Accessibility statement', 'replied', false],
+            ['Noah Williams', 'noah@example.com', 'Student discount', 'read', true],
         ];
-        foreach ($contacts as $i => [$name, $email, $subject, $status]) {
+        // Archiving sets archived_at; it is not a status.
+        foreach ($contacts as $i => [$name, $email, $subject, $status, $archived]) {
             ContactSubmission::factory()->create([
                 'reply' => $status === 'replied' ? "Thanks {$name}, details are on their way by email." : null,
                 'replied_at' => $status === 'replied' ? now()->subDays($i) : null,
@@ -137,24 +139,28 @@ class ScreenshotSeeder extends Seeder
                 'subject' => $subject,
                 'message' => "Hello,\n\nCould you tell me more about {$subject}? We are evaluating the product for a team of twelve.\n\nThanks,\n{$name}",
                 'status' => $status,
+                'archived_at' => $archived ? now()->subDays($i) : null,
                 'created_at' => now()->subDays($i + 1),
             ]);
         }
 
         if (function_exists('activity')) {
+            // A few log streams, so the viewer's log-name badges and its
+            // "Log stream" filter have something to show.
             $events = [
-                ['updated', $users[0], ['attributes' => ['name' => 'Linus Torvalds'], 'old' => ['name' => 'L. Torvalds']]],
-                ['created', $users[11], ['attributes' => ['email' => 'hedy@example.com']]],
-                ['updated', $users[3], ['attributes' => ['email_verified_at' => null]]],
-                ['deleted', $users[7], []],
-                ['updated', $grace, ['attributes' => ['two_factor_confirmed_at' => now()->toDateTimeString()]]],
+                ['updated', $users[0], ['attributes' => ['name' => 'Linus Torvalds'], 'old' => ['name' => 'L. Torvalds']], 'users'],
+                ['created', $users[11], ['attributes' => ['email' => 'hedy@example.com']], 'users'],
+                ['updated', $users[3], ['attributes' => ['email_verified_at' => null]], 'users'],
+                ['deleted', $users[7], [], 'default'],
+                ['updated', $grace, ['attributes' => ['two_factor_confirmed_at' => now()->toDateTimeString()]], 'auth'],
             ];
-            foreach ($events as $i => [$event, $subject, $properties]) {
-                activity()
+            foreach ($events as $i => [$event, $subject, $properties, $log]) {
+                activity($log)
                     ->causedBy($i % 2 ? $admin : $subject)
                     ->performedOn($subject)
                     ->event($event)
                     ->withProperties($properties)
+                    ->createdAt(now()->subHours($i * 7 + 1)->subMinutes($i * 13))
                     ->log($event);
             }
         }

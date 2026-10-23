@@ -36,38 +36,28 @@ new class extends Component
 
 <section>
     <header>
-        <h2 class="text-base/7 font-semibold text-zinc-950 dark:text-zinc-50">{{ __('Update Password') }}</h2>
-        <p class="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">{{ __('Ensure your account is using a long, random password to stay secure.') }}</p>
+        <h2 class="text-heading font-semibold text-fg">{{ __('Update Password') }}</h2>
+        <p class="mt-1 text-body text-fg-muted">{{ __('Ensure your account is using a long, random password to stay secure.') }}</p>
     </header>
 
     <form wire:submit="updatePassword" class="mt-6 space-y-6">
-        <div>
-            <label for="update_password_current_password" class="block text-sm/6 font-medium text-zinc-950 dark:text-zinc-50 mb-2">{{ __('Current Password') }}</label>
-            <input type="password" id="update_password_current_password" wire:model="current_password" autocomplete="current-password"
-                class="block w-full rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            @error('current_password') <p class="mt-2 text-sm/6 text-red-600">{{ $message }}</p> @enderror
-        </div>
+        <x-ds::input type="password" id="update_password_current_password" label="{{ __('Current Password') }}"
+            wire:model="current_password" autocomplete="current-password"
+            :error="$errors->first('current_password')" />
 
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div>
-                <label for="update_password_password" class="block text-sm/6 font-medium text-zinc-950 dark:text-zinc-50 mb-2">{{ __('New Password') }}</label>
-                <input type="password" id="update_password_password" wire:model="password" autocomplete="new-password"
-                    class="block w-full rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                @error('password') <p class="mt-2 text-sm/6 text-red-600">{{ $message }}</p> @enderror
-            </div>
-            <div>
-                <label for="update_password_password_confirmation" class="block text-sm/6 font-medium text-zinc-950 dark:text-zinc-50 mb-2">{{ __('Confirm Password') }}</label>
-                <input type="password" id="update_password_password_confirmation" wire:model="password_confirmation" autocomplete="new-password"
-                    class="block w-full rounded-lg border border-zinc-950/10 dark:border-white/10 bg-transparent px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                @error('password_confirmation') <p class="mt-2 text-sm/6 text-red-600">{{ $message }}</p> @enderror
-            </div>
+            <x-ds::input type="password" id="update_password_password" label="{{ __('New Password') }}"
+                wire:model="password" autocomplete="new-password"
+                :error="$errors->first('password')" />
+
+            <x-ds::input type="password" id="update_password_password_confirmation" label="{{ __('Confirm Password') }}"
+                wire:model="password_confirmation" autocomplete="new-password"
+                :error="$errors->first('password_confirmation')" />
         </div>
 
         <div class="flex items-center gap-4">
-            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-zinc-950 dark:bg-indigo-600 px-4 py-2 text-sm/6 font-semibold text-white hover:bg-zinc-800 dark:hover:bg-indigo-500">
-                {{ __('Save') }}
-            </button>
-            <x-action-message class="text-sm/6 text-zinc-500 dark:text-zinc-400" on="password-updated">{{ __('Saved.') }}</x-action-message>
+            <x-ds::button type="submit">{{ __('Save') }}</x-ds::button>
+            <x-action-message on="password-updated">{{ __('Saved.') }}</x-action-message>
         </div>
     </form>
 </section>

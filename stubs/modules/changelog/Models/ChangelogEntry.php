@@ -51,4 +51,18 @@ class ChangelogEntry extends Model
             default => ucfirst((string) $this->category),
         };
     }
+
+    /**
+     * The badge tone for the category, from the design system's five. Beside
+     * category_label, so a new category gets its words and its tone together.
+     */
+    public function categoryTone(): string
+    {
+        return match ($this->category) {
+            'feature' => 'accent',
+            'improvement' => 'warning',
+            'fix' => 'success',
+            default => 'neutral',
+        };
+    }
 }

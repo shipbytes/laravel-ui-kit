@@ -6,12 +6,12 @@ use App\Models\User;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
+use Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination;
 
 #[Layout('layouts.admin-sidebar')]
 class UserList extends Component
 {
-    use WithPagination;
+    use WithDesignSystemPagination;
 
     #[Url(as: 'q')]
     public string $search = '';

@@ -24,6 +24,7 @@ class DoctorCommand extends Command
         $this->checkLivewire();
         $this->checkFortify();
         $this->checkViteWiring();
+        $this->checkDesignSystem();
         $this->checkUserTrait();
         $this->checkModuleRequirements();
         $this->checkDuplicateRouteNames();
@@ -206,6 +207,149 @@ class DoctorCommand extends Command
             $this->passCheck('ui-kit.js imported from app.js');
         } else {
             $this->failCheck('ui-kit.js imported from app.js', "add import './ui-kit'; to resources/js/app.js");
+        }
+    }
+
+    /**
+     * 0.4 moved the kit onto the Shipbytes design system. An app upgraded from
+     * 0.3 keeps its old ui-kit.css, which imports the kit's own theme file and
+     * never reaches the design system's tokens, and its custom nav entries
+     * keep icon names from the old partial. The first throws nothing and
+     * renders unstyled components; the second makes every admin page fail,
+     * since ds::icon cannot find heroicon-o-<name> and the sidebar is on all
+     * of them, with an error that never mentions config/admin.php.
+     */
+    protected function checkDesignSystem(): void
+    {
+        if (file_exists(base_path('vendor/shipbytes/blade-ui/dist/theme.css'))) {
+            $this->passCheck('design system installed');
+        } else {
+            $this->failCheck('design system installed', 'composer require shipbytes/blade-ui');
+        }
+
+        $css = resource_path('css/ui-kit.css');
+
+        if (! file_exists($css)) {
+            $this->skipCheck('ui-kit.css imports the design system', 'resources/css/ui-kit.css not published');
+        } else {
+            $contents = (string) file_get_contents($css);
+
+            if (str_contains($contents, 'blade-ui/dist/theme.css') && str_contains($contents, '@source')) {
+                $this->passCheck('ui-kit.css imports the design system');
+            } else {
+                $this->failCheck('ui-kit.css imports the design system', 'php artisan vendor:publish --tag=ui-kit-assets --force (the 0.3 file imported ./ui-kit-theme.css instead)');
+            }
+
+            // The admin screens' page header is a package view, so its classes
+            // exist only if Tailwind scans the kit in vendor/. Without it the
+            // header renders with whatever classes a published view happens to
+            // share, which looks almost right.
+            if (str_contains($contents, 'laravel-ui-kit/resources/views')) {
+                $this->passCheck("ui-kit.css scans the kit's own views");
+            } else {
+                $this->failCheck("ui-kit.css scans the kit's own views", 'php artisan vendor:publish --tag=ui-kit-assets --force (ui-kit.css from before 0.4 lacks the @source line for vendor/shipbytes/laravel-ui-kit/resources/views)');
+            }
+        }
+
+        if (file_exists(resource_path('css/ui-kit-theme.css'))) {
+            $this->failCheck('no leftover ui-kit-theme.css', 'delete resources/css/ui-kit-theme.css: tokens now come from the design system, and any overrides belong in app.css after the ui-kit.css import (:root { --ds-accent: … })');
+        } else {
+            $this->passCheck('no leftover ui-kit-theme.css');
+        }
+
+        $this->checkFontOverride();
+        $this->checkNavIcons();
+        $this->checkAdminPagination();
+    }
+
+    /**
+     * A --font-sans declared after the ui-kit.css import beats the design
+     * system's Inter. The Laravel 12 skeleton's is Instrument Sans, which
+     * nothing loads, so the app renders in the system font and nothing says so.
+     */
+    protected function checkFontOverride(): void
+    {
+        $check = 'app.css does not override the design system font';
+        $css = resource_path('css/app.css');
+        $contents = file_exists($css) ? (string) file_get_contents($css) : '';
+
+        if (! preg_match("/^@import\s+['\"](?:\.\/)?ui-kit\.css['\"].*$/m", $contents, $import, PREG_OFFSET_CAPTURE)) {
+            $this->skipCheck($check, 'app.css does not import ui-kit.css');
+
+            return;
+        }
+
+        $after = substr($contents, $import[0][1] + strlen($import[0][0]));
+
+        if (preg_match("/--font-sans:\s*['\"]?Instrument Sans/", $after)) {
+            $this->failCheck($check, "delete the @theme { --font-sans: 'Instrument Sans', … } block from resources/css/app.css (nothing loads that font), or re-run php artisan ui-kit:install");
+        } elseif (preg_match('/--font-sans\s*:/', $after)) {
+            $this->skipCheck($check, 'you override the font; make sure it is loaded');
+        } else {
+            $this->passCheck($check);
+        }
+    }
+
+    /**
+     * The published admin lists page through WithDesignSystemPagination. One
+     * still on plain WithPagination renders Livewire's own Tailwind pager,
+     * palette colours and all, which works and looks foreign; nothing errors.
+     */
+    protected function checkAdminPagination(): void
+    {
+        $check = 'admin lists paginate with the design system';
+        $dir = app_path('Livewire/Admin');
+
+        if (! is_dir($dir)) {
+            $this->skipCheck($check, 'app/Livewire/Admin not published');
+
+            return;
+        }
+
+        $stale = [];
+
+        foreach ((new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS))) as $file) {
+            /** @var \SplFileInfo $file */
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $contents = (string) file_get_contents($file->getPathname());
+
+            if (preg_match('/^\s*use\s+WithPagination\s*;/m', $contents) && ! str_contains($contents, 'function paginationView')) {
+                $stale[] = $file->getBasename('.php');
+            }
+        }
+
+        if ($stale === []) {
+            $this->passCheck($check);
+        } else {
+            $this->failCheck($check, implode(', ', $stale).': replace `use WithPagination;` with `use \\Shipbytes\\UiKit\\Livewire\\Concerns\\WithDesignSystemPagination;`, or republish with php artisan ui-kit:install --force');
+        }
+    }
+
+    protected function checkNavIcons(): void
+    {
+        $svgDir = base_path('vendor/blade-ui-kit/blade-heroicons/resources/svg');
+        $aliases = (array) config('blade-ui.icon_aliases', []);
+        $bad = [];
+
+        foreach ((array) config('admin.nav', []) as $item) {
+            if (! is_array($item) || ! isset($item['icon']) || ! is_string($item['icon'])) {
+                continue;
+            }
+
+            $icon = $item['icon'];
+
+            if (! file_exists("{$svgDir}/o-{$icon}.svg") && ! array_key_exists($icon, $aliases)) {
+                $bad[] = ($item['label'] ?? '?').' => '.$icon;
+            }
+        }
+
+        if ($bad === []) {
+            $this->passCheck('nav icons are Heroicons');
+        } else {
+            $this->failCheck('nav icons are Heroicons', 'not found: '.implode(', ', $bad).'. 0.4 switched nav icons to Heroicons v2 names (heroicons.com); e.g. grid → squares-2x2, note → document-text, mail → envelope, history → clock');
         }
     }
 

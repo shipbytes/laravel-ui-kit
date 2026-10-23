@@ -94,4 +94,27 @@ class SupportTicket extends Model
         $this->closed_at = null;
         $this->save();
     }
+
+    /**
+     * The badge tone for the status, from the design system's five. Kept here
+     * so the list and the detail page cannot drift apart.
+     */
+    public function statusTone(): string
+    {
+        return match ($this->status) {
+            'open' => 'accent',
+            'in_progress' => 'warning',
+            'resolved' => 'success',
+            default => 'neutral',
+        };
+    }
+
+    public function priorityTone(): string
+    {
+        return match ($this->priority) {
+            'high' => 'danger',
+            'medium' => 'accent',
+            default => 'neutral',
+        };
+    }
 }

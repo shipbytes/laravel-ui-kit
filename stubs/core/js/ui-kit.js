@@ -18,10 +18,17 @@ document.addEventListener('alpine:init', () => {
         },
     });
 
-    // Theme store — backs <x-theme-toggle /> and the no-flash snippet in
-    // <x-ui-kit::head />.
+    // Theme store — backs <x-theme-toggle /> and mirrors the no-flash snippet
+    // in <x-ui-kit::head />, so first paint and the store always agree.
+    //
+    // Exactly one of `light` / `dark` sits on <html>. The design system's
+    // tokens follow the OS preference whenever <html> carries NEITHER class,
+    // so leaving `light` off would give a dark-OS user who chose light the
+    // dark tokens under light-variant markup. With no stored choice the value
+    // follows the OS; the toggle stores an explicit one.
     window.Alpine.store('theme', {
-        value: localStorage.getItem('ui-kit.theme') || 'light',
+        value: localStorage.getItem('ui-kit.theme')
+            || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
         init() {
             this.apply();
         },
@@ -31,7 +38,18 @@ document.addEventListener('alpine:init', () => {
             this.apply();
         },
         apply() {
-            document.documentElement.classList.toggle('dark', this.value === 'dark');
+            const root = document.documentElement.classList;
+            root.toggle('dark', this.value === 'dark');
+            root.toggle('light', this.value !== 'dark');
         },
     });
+});
+
+// wire:navigate copies the next page's html element attributes over this one,
+// and that markup carries neither theme class: the head snippet adds it at
+// runtime and is not re-run on a swap. Without this, every page reached by
+// wire:navigate (the 2FA challenge after login, any wire:navigate link)
+// rendered light whatever the choice. onSwap runs before paint, so no flash.
+document.addEventListener('livewire:navigating', (event) => {
+    event.detail.onSwap(() => window.Alpine.store('theme').apply());
 });

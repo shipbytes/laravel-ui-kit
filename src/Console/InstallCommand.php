@@ -7,6 +7,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Shipbytes\UiKit\Console\Concerns\InstallsModule;
 use Shipbytes\UiKit\Support\ModuleRegistry;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
@@ -104,12 +105,16 @@ class InstallCommand extends Command
         }
 
         $this->line("  <fg=yellow>{$step}.</> Add the kit's component tags to your master layout (<info>resources/views/layouts/app.blade.php</info>):");
-        $this->line('       <fg=gray>&lt;head&gt;</>');
-        $this->line('       <fg=gray>    &lt;x-ui-kit::head /&gt;       <!-- dark-mode no-flash --&gt;</>');
-        $this->line('       <fg=gray>&lt;/head&gt;</>');
-        $this->line('       <fg=gray>&lt;body&gt;</>');
-        $this->line('       <fg=gray>    &lt;x-ui-kit::banners /&gt;    <!-- impersonation ribbon --&gt;</>');
-        $this->line('       <fg=gray>&lt;/body&gt;</>');
+        foreach ([
+            '<head>',
+            '    <x-ui-kit::head />       <!-- dark-mode no-flash -->',
+            '</head>',
+            '<body>',
+            '    <x-ui-kit::banners />    <!-- impersonation ribbon -->',
+            '</body>',
+        ] as $html) {
+            $this->line('       <fg=gray>'.OutputFormatter::escape($html).'</>');
+        }
         $this->newLine();
         $step++;
 
@@ -119,7 +124,7 @@ class InstallCommand extends Command
         $step++;
 
         $this->line("  <fg=yellow>{$step}.</> Build assets:");
-        $this->line('       <fg=gray>npm install &amp;&amp; npm run dev</>');
+        $this->line('       <fg=gray>npm install && npm run dev</>');
         $this->newLine();
         $step++;
 
@@ -152,8 +157,9 @@ class InstallCommand extends Command
      * Wire the kit's CSS/JS into the app's Vite entrypoints so no manual
      * import edits are needed. Idempotent — skips when already wired.
      *
-     * The CSS import goes right after `@import 'tailwindcss';` because the
-     * kit's @theme / @custom-variant blocks must follow Tailwind's base
+     * The CSS import goes right after `@import 'tailwindcss';` because
+     * ui-kit.css pulls in the design system's tokens and theme (its @theme
+     * block and @custom-variant dark), which must follow Tailwind's base
      * import in the final bundle.
      */
     protected function patchViteEntrypoints(): void
@@ -173,6 +179,8 @@ class InstallCommand extends Command
                 file_put_contents($css, $contents);
                 $this->line("  ✓ patched <info>resources/css/app.css</info> <comment>@import './ui-kit.css'</comment>");
             }
+
+            $this->removeSkeletonFont($css);
         } else {
             warning("resources/css/app.css not found — add `@import './ui-kit.css';` to your Tailwind entry CSS yourself.");
         }
@@ -189,6 +197,31 @@ class InstallCommand extends Command
         } else {
             warning("resources/js/app.js not found — add `import './ui-kit';` to your JS entry yourself.");
         }
+    }
+
+    /**
+     * Laravel 12's skeleton app.css ends with an @theme block setting
+     * --font-sans to 'Instrument Sans'. It sits after the kit's import, so it
+     * beats the design system's Inter, and since nothing loads Instrument Sans
+     * the app silently renders in the system font. Only that exact
+     * declaration goes; a font the app chose for itself is left alone.
+     */
+    protected function removeSkeletonFont(string $css): void
+    {
+        $contents = (string) file_get_contents($css);
+
+        // The value runs to the semicolon, across the skeleton's line continuation.
+        $patched = preg_replace("/^[ \t]*--font-sans:\s*['\"]Instrument Sans['\"][^;]*;[ \t]*\R?/m", '', $contents, -1, $removed);
+
+        if (! $removed) {
+            return;
+        }
+
+        // Drop the block if that was all it held, with the blank line before it.
+        $patched = preg_replace('/\R?^@theme\s*\{\s*\}[ \t]*(\R|\z)/m', '', (string) $patched);
+
+        file_put_contents($css, $patched);
+        $this->line("  ✓ removed the skeleton's Instrument Sans --font-sans from app.css <comment>(the design system sets Inter)</comment>");
     }
 
     protected function publishCore(): void
@@ -415,7 +448,7 @@ class InstallCommand extends Command
         $this->line('Type comma-separated numbers to install (e.g. <info>1,3,5</info>), <info>all</info> for everything, or press <info>Enter</info> to install core only.');
         $this->output->write('> ');
 
-        $line = fgets(STDIN);
+        $line = defined('STDIN') ? fgets(STDIN) : false;
 
         if ($line === false) {
             return [];

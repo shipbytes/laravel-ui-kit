@@ -166,7 +166,6 @@ class UiKitServiceProvider extends ServiceProvider
         $this->publishes([
             $core.'/js/ui-kit.js' => resource_path('js/ui-kit.js'),
             $core.'/css/ui-kit.css' => resource_path('css/ui-kit.css'),
-            $core.'/css/ui-kit-theme.css' => resource_path('css/ui-kit-theme.css'),
         ], 'ui-kit-assets');
 
         $this->publishes([
