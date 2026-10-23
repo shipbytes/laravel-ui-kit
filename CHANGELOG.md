@@ -177,6 +177,10 @@ are all built on it.
   build.
 - After Save photo or Cancel, the drop zone still listed the file just saved
   or discarded. It now resets.
+- `ui-kit:install` and `ui-kit:install-module` no longer fail with
+  `Undefined constant STDIN` when run outside a CLI script, such as through
+  `Artisan::call()` in a web request. Without a STDIN they treat the session
+  as non-interactive.
 
 ### Removed
 
