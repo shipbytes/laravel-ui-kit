@@ -10,6 +10,129 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+A hardening release: no breaking changes. The installer closes five Fortify
+endpoints that answered with a 500, keeps a user's two-factor secrets out of
+its JSON, and several things that were README instructions now happen on their
+own. "Upgrading from 0.4.0" at the end of this entry has the steps.
+
+### Security
+
+- **Fortify's endpoints the kit does not own are switched off.** `views =>
+  false` only removed Fortify's GET pages; it still registered `POST /register`,
+  `POST /forgot-password`, `POST /reset-password`, `PUT /user/profile-information`
+  and `PUT /user/password`. Each resolves an action class (`CreatesNewUsers`
+  and friends) that no kit app binds, so each answered with a 500, and an app
+  that did bind `CreatesNewUsers` got a second registration path that skipped
+  the kit's disposable-email rule and its limiter. The installer now comments
+  out `Features::registration()`, `resetPasswords()`, `updateProfileInformation()`
+  and `updatePasswords()` in `config/fortify.php` (the kit's own pages do all
+  five jobs) and leaves `emailVerification()` alone. The patch is idempotent
+  and lint-checked, and update mode applies it to an existing install.
+- **The two-factor columns are hidden on the User model.** The profile module
+  adds `TwoFactorAuthenticatable` to the model but never hid its columns, so
+  `toArray()` and the JSON of any user carried the encrypted
+  `two_factor_secret` and `two_factor_recovery_codes`. The installer adds both
+  to the model's `$hidden`, whether that is a `protected $hidden` array (the
+  Laravel 12 skeleton), a `#[Hidden([...])]` attribute (Laravel 13), or
+  missing. A model that already lists them is left alone, and the result is
+  lint-checked like the trait patch.
+
+### Fixed
+
+- **Fortify's `POST /login` no longer 500s for a two-factor user.** It
+  redirects such a user to the route `two-factor.login`, which did not exist:
+  the kit's page is `two-factor.challenge`. `routes/auth.php` adds
+  `two-factor.login` as a redirect to the kit's page, which now also accepts
+  the login Fortify staged in the session (`login.id`, `login.remember`), so
+  that sign-in completes. `route('two-factor.challenge')` is unchanged.
+- **The installer no longer leaves passkeys on.** Fortify's published config
+  spreads `Features::passkeys([...])` over three lines, which the 0.4.0 patch
+  never matched. Each disabled feature's whole call is now commented out.
+- **The profile page's two-factor card honours `confirmPassword`.** Fortify's
+  published config sets it, but the card called the actions directly, so
+  enabling, disabling, showing and regenerating recovery codes never asked for
+  the password. Without a confirmation inside `auth.password_timeout`, those
+  actions now go to the confirm-password page, which returns to the profile.
+- **A failed registration no longer uses up the hourly limit.** The register
+  page counted every submit against its ten per IP per hour before validating,
+  so a few typos locked the address out. Only a successful registration counts
+  now.
+- **The 2FA challenge reads secrets with Fortify's encrypter**
+  (`Fortify::currentEncrypter()`), so an app that set its own with
+  `Fortify::encryptUsing()` can sign in.
+- **A failed login fires `Illuminate\Auth\Events\Failed`.** The login form
+  checks credentials with `validate()`, which fires no event, so listeners and
+  audit logs never saw a failed login.
+- **Registering regenerates the session**, as signing in already did.
+- **Avatars are stored under a random 40-character name**, not the user's id,
+  which made every photo on the public disk guessable. The old file is still
+  deleted on replace, and deleting an account now deletes its photo too.
+- **`ui-kit:doctor` reports correctly when called twice in one process.** It
+  kept the first run's rows and its failure.
+
+### Added
+
+- **Sidebar badges work without code.** `ModuleRegistry` has always declared
+  the `open_tickets` and `unread_contacts` badges, but bound a resolver that
+  returned nothing. The new default, `Shipbytes\UiKit\Support\DefaultBadgeResolver`,
+  counts `SupportTicket::open()` and `ContactSubmission::unread()` (new scope:
+  unread and not archived) when those models exist, once per request. A count
+  that fails, such as a table not yet migrated, is left out instead of failing
+  every admin page. An app that binds its own `SidebarBadgeResolver` still wins.
+- **The phone bottom bar shows the badges**, through the new `badge` prop on
+  `ds::bottom-nav-item`. Requires `shipbytes/blade-ui` ^1.2.3, which caps the
+  pill at "9+" and reads the full count to screen readers.
+- **The phone "More" sheet** ends with Profile (when the profile module is
+  installed), Back to site and Log out, which a phone could not reach before.
+  The user shell gains a Profile link (the user's avatar) beside Log out.
+- **Avatars appear across the shells.** The generated `UiKitUser` trait gains
+  `avatarUrl(): ?string` when the profile module is installed, and the admin
+  rail, the user list, the user detail page and the user shell show it.
+  `UiKit::avatarUrl($user)` returns null without the module, so those views
+  fall back to initials.
+- **Admin user screens.** The user list and detail show an "Admin" badge
+  (`UiKit::isAdmin($user)`: the Spatie `admin` role or the `is_admin` column,
+  the same test as the user shell). The detail page has a Delete user button,
+  which the server refuses for admins and for yourself.
+- **The impersonation button is wired in.** The user detail page includes
+  `partials.impersonation-button` when it exists, so the README's "add this
+  line yourself" step is gone.
+- **Resending the verification email is throttled** to six a minute per user,
+  shared between the verify-email page and the profile page, with a message
+  when the limit is hit.
+- **The register page checks names** against letters, spaces, apostrophes,
+  hyphens and full stops, with a plain message.
+- **Doctor rows:** `fortify features limited to two-factor`,
+  `two-factor.login route registered`, `two-factor columns hidden on the User
+  model`, `sidebar badges resolve`, `impersonation button wired` (with the
+  impersonation module) and `trusted proxies configured`. The last passes when
+  `bootstrap/app.php` calls `trustProxies(`, is a skip outside production and
+  fails in production. Behind an untrusted proxy every visitor shares one IP,
+  so ten registrations an hour lock out everyone.
+- **Behaviour tests** for every auth page (login, register, password reset,
+  email verification, confirm password, the 2FA challenge), the profile's 2FA
+  card and avatar, the admin user screens, the shell and the admin ticket
+  screen: 133 tests, up from 68.
+
+### Upgrading from 0.4.0
+
+1. `composer update shipbytes/laravel-ui-kit -W` (`-W` lets Composer take
+   `shipbytes/blade-ui` to 1.2.3).
+2. Commit first, then either:
+   - re-run the installer in update mode with every installed module:
+     `php artisan ui-kit:install --force --modules=…` (the names
+     `ui-kit:list-modules` shows). This applies the two security patches and
+     republishes the changed stubs. As in 0.4.0, `--force` overwrites
+     `config/admin.php` and `config/ui-kit.php`, so read `git diff` and
+     restore your own nav entries and values; or
+   - without `--force`, which keeps every file you own and still applies both
+     security patches (they edit `config/fortify.php` and `app/Models/User.php`
+     in place), then follow the doctor's hints for the rest: the
+     `two-factor.login` route line in `routes/auth.php` and the impersonation
+     include on the user detail page.
+3. `npm run build`.
+4. `php artisan ui-kit:doctor`. Every row should pass, or skip with a reason.
+
 ## [0.4.0] - 2026-10-23
 
 0.4.0 moves the kit onto the Shipbytes design system (`shipbytes/blade-ui`).

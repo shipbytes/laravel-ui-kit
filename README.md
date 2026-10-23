@@ -14,7 +14,7 @@ Core + 7 optional modules, installed by a turnkey `php artisan ui-kit:install`. 
 - **Working 2FA** — the login flow stages a TOTP/recovery-code challenge for users who enabled two-factor auth (enable/confirm UI ships with the `profile` module)
 - **Admin shell** — collapsible sidebar, mobile bottom nav with a "More" sheet, theme toggle, current-user footer with profile link + logout; nav is config-driven from `config/admin.php` with Heroicons v2 icon names
 - **User shell** — a light authenticated layout (`layouts/user-shell`) used by user-facing pages like `/profile`
-- **Dashboard stub + Users list/detail** — stat tiles, a searchable table, and the `<x-ui-kit::page-header>` component every admin screen opens with
+- **Dashboard stub + Users list/detail** — stat tiles, a searchable table with avatars and an Admin badge, a detail page with a guarded Delete user button, and the `<x-ui-kit::page-header>` component every admin screen opens with
 - **Built on the Shipbytes design system** — every view uses [`shipbytes/blade-ui`](https://shipbytes.dev/docs/design-system) (`ds::` Blade components, semantic tokens that switch for dark mode on their own, Heroicons v2, Inter); it comes with the kit, so there's no separate install step
 - **`WithDesignSystemPagination`** — a Livewire trait that pages any list with the design system's pagination, keeping its search and filters
 - **Alpine stores** — sidebar collapse (localStorage-persisted), theme toggle with no-flash snippet (follows the OS until the user picks a theme)
@@ -136,11 +136,12 @@ composer update shipbytes/laravel-ui-kit
 ### What the installer automates
 
 - Publishes every kit + dependency config, view, class, route file, and migration
-- Patches `config/fortify.php` (`views=false`, `home=/`, passkeys feature off) and publishes Fortify's 2FA columns migration
+- Patches `config/fortify.php` (`views=false`, `home=/`, and turns off the features whose endpoints the kit's own pages replace: registration, password reset, profile and password updates, passkeys) and publishes Fortify's 2FA columns migration
 - Patches `config/admin.php` nav and `routes/admin.php` / `routes/ui-kit-user.php` between `/* ui-kit:* */` markers — **idempotently**, and without wiping other modules' entries
 - **Wires your Vite entrypoints**: adds `@import './ui-kit.css';` to `resources/css/app.css` and `import './ui-kit';` to `resources/js/app.js`, and deletes the skeleton's Instrument Sans `--font-sans` from `app.css` (see [Finish wiring](#finish-wiring-the-irreducible-checklist))
 - Runs `vendor:publish` for every dependent package, one `php artisan migrate`, seeds the admin role, runs `storage:link`
-- Generates `app/Models/Concerns/UiKitUser.php` bundling exactly the traits your chosen modules need (Spatie `HasRoles`, lab404 `Impersonate`, Fortify `TwoFactorAuthenticatable`) — **and applies it to `app/Models/User.php` automatically** (the patch is lint-checked and reverted if it would break the file; you only edit by hand if the installer says so)
+- Generates `app/Models/Concerns/UiKitUser.php` bundling exactly the traits your chosen modules need (Spatie `HasRoles`, lab404 `Impersonate`, Fortify `TwoFactorAuthenticatable` plus `avatarUrl()`) — **and applies it to `app/Models/User.php` automatically** (the patch is lint-checked and reverted if it would break the file; you only edit by hand if the installer says so)
+- With the `profile` module, adds `two_factor_secret` and `two_factor_recovery_codes` to the User model's `$hidden` (or its `#[Hidden]` attribute), so a user's JSON never carries them
 - Auto-loads `routes/auth.php`, `routes/admin.php`, `routes/ui-kit-user.php` from the service provider — no `bootstrap/app.php` edit
 - Registers sane `login` / `two-factor` rate limiters unless your app already defines them
 
@@ -318,7 +319,9 @@ defines its own `paginationView()` keeps it.
 
 ### Sidebar badges
 
-Bind your own resolver so counters (e.g. "open tickets: 12") reflect your data:
+A nav entry's `badge` key names a count, shown on the desktop rail and the phone bottom bar (capped at "9+" there). The kit's `DefaultBadgeResolver` is bound out of the box and counts `open_tickets` (`SupportTicket::open()`) and `unread_contacts` (`ContactSubmission::unread()`) when those modules are installed, once per request. A count that throws, such as a table not yet migrated, is left out rather than failing every admin page, and `ui-kit:doctor` reports it.
+
+For badges of your own, bind a resolver that returns every key your nav uses:
 
 ```php
 // In a service provider
@@ -328,15 +331,19 @@ $this->app->bind(
 );
 ```
 
-The resolver returns `['open_tickets' => 12, 'unread_contacts' => 3]` — keys match the `badge` field on nav items.
+It returns `['open_tickets' => 12, 'unread_contacts' => 3, 'pending_orders' => 4]`. Yours replaces the default entirely, so extend `DefaultBadgeResolver` (and merge `parent::compute()`) to keep the kit's two counts. The doctor's `sidebar badges resolve` row fails when a nav entry's key is missing from the output, because a missing badge looks exactly like a count of zero.
 
 ## Two-factor authentication
 
 Fortify's `twoFactorAuthentication` feature is enabled by default. With the `profile` module installed (which adds `TwoFactorAuthenticatable` to the generated trait and ensures the columns exist), users get the full flow:
 
 1. **Enable** on `/profile` → scan the QR code → (when Fortify's `confirm` option is on) enter a code to confirm → save recovery codes.
-2. **Login** validates credentials first, then redirects 2FA users to `/two-factor-challenge` for a TOTP or recovery code. Both steps are rate limited.
+2. **Login** validates credentials first, then redirects 2FA users to `/two-factor-challenge` for a TOTP or recovery code. Both steps are rate limited. Fortify's own `POST /login` works too: it redirects to `two-factor.login`, which the kit points at the same page, and the page picks up the login Fortify staged.
 3. **Disable / regenerate recovery codes** any time from the profile page.
+
+The installed `config/fortify.php` turns on Fortify's `confirmPassword` option, so enabling, disabling, showing and regenerating recovery codes first ask for the password unless it was confirmed within `auth.password_timeout` (three hours by default). The confirm page returns the user to `/profile`.
+
+Secrets are read with `Fortify::currentEncrypter()`, so `Fortify::encryptUsing()` works.
 
 Without the `profile` module (or without the trait applied), login simply never challenges — nothing breaks.
 
@@ -360,19 +367,19 @@ Re-running `ui-kit:install` is safe: it detects the existing install, keeps your
 Ships `EnsureUserIsAdmin` (Spatie role check) + `AdminRoleSeeder`. The installer publishes Spatie's config/migrations, migrates, seeds the `admin`/`user` roles, and swaps the middleware in `config/admin.php` from the `is_admin` fallback to the role check. The `UiKitUser` trait (with `HasRoles`) is applied to your User model automatically; grant the role with `php artisan ui-kit:make-admin you@example.com`.
 
 ### `support-tickets`
-Admin-only queue (the public form is yours to build). The list opens with four stat tiles (total, open, in progress, resolved), then a search field and status/priority/category filters over a table (Subject, From, Status, Priority, Category, Updated) with badge tones from `SupportTicket::statusTone()` / `priorityTone()`, and Livewire pagination. A ticket shows the thread, an inline reply, and Status and Priority selects in one labelled panel, validated server-side. Mailables are intentionally omitted so you plug in your own notification flow.
+Admin-only queue (the public form is yours to build). The Support nav entry shows the open-ticket count on its own (see [Sidebar badges](#sidebar-badges)). The list opens with four stat tiles (total, open, in progress, resolved), then a search field and status/priority/category filters over a table (Subject, From, Status, Priority, Category, Updated) with badge tones from `SupportTicket::statusTone()` / `priorityTone()`, and Livewire pagination. A ticket shows the thread, an inline reply, and Status and Priority selects in one labelled panel, validated server-side. Mailables are intentionally omitted so you plug in your own notification flow.
 
 ### `changelog`
 Admin CRUD + `ChangelogEntry::published()` scope for a public feed. The list is a table with a title search, a category filter, category badges (`ChangelogEntry::categoryTone()`) and Published/Draft badges; the form's Published toggle is a `ds::switch` saved with the rest of the form. HTML is sanitized via `mews/purifier`. For a public page, add a route rendering your own view over the `published()` scope (the module ships only the admin side).
 
 ### `contacts`
-Inbox for a public contact form that writes to `contact_submissions`. Stat tiles (total, unread, replied, archived), a search field and a status filter over a table with a select column; selecting rows shows a bulk bar (Mark read, Mark unread, Archive, Delete). A message opens in a `ds::modal` with its reply draft (bring your own Mailable). Archiving sets `archived_at`; archived messages leave the inbox and show under the Archived filter. When `support-tickets` is also installed, a **Copy to Ticket** button appears automatically.
+Inbox for a public contact form that writes to `contact_submissions`. Stat tiles (total, unread, replied, archived), a search field and a status filter over a table with a select column; selecting rows shows a bulk bar (Mark read, Mark unread, Archive, Delete). A message opens in a `ds::modal` with its reply draft (bring your own Mailable). Archiving sets `archived_at`; archived messages leave the inbox and show under the Archived filter. When `support-tickets` is also installed, a **Copy to Ticket** button appears automatically. The Contacts nav entry shows the unread count (unread and not archived) on its own.
 
 ### `profile`
-Cards under `/profile` (rendered in the user shell, not the admin shell): update info + avatar, update password, two-factor authentication, delete account. The avatar is a round `ds::avatar` (initials until a photo exists) beside a `ds::file-upload` drop zone with Save photo, Cancel and Remove; deleting the account confirms the password in a `ds::modal`. Avatars are stored under a content-derived extension and resized to 200×200 when `intervention/image` is installed. The profile stores `avatar_path` with `forceFill()`, so a stock `User` model's `$fillable` doesn't need changing.
+Cards under `/profile` (rendered in the user shell, not the admin shell): update info + avatar, update password, two-factor authentication, delete account. The avatar is a round `ds::avatar` (initials until a photo exists) beside a `ds::file-upload` drop zone with Save photo, Cancel and Remove; deleting the account confirms the password in a `ds::modal`. Avatars are stored on the public disk under a random 40-character name with a content-derived extension, resized to 200×200 when `intervention/image` is installed; replacing a photo deletes the old file, and deleting the account deletes the photo. The profile stores `avatar_path` with `forceFill()`, so a stock `User` model's `$fillable` doesn't need changing. The generated trait's `avatarUrl()` puts the photo in the admin rail, the user list and detail, and the user shell. Re-sending the verification email is limited to six a minute per user.
 
 ### `impersonation`
-Two Blade partials over `lab404/laravel-impersonate`. The package ships its routes as a macro; the installer calls it for you by adding `Route::impersonate();` to `routes/ui-kit-user.php` (web + auth), which registers `impersonate` and `impersonate.leave`. `ui-kit:doctor` checks both routes exist. `<x-ui-kit::banners />` shows the exit ribbon automatically; `@include('partials.impersonation-button', ['user' => $user])` renders the login-as button. The generated `UiKitUser` trait provides `canImpersonate()` / `canBeImpersonated()`.
+Two Blade partials over `lab404/laravel-impersonate`. The package ships its routes as a macro; the installer calls it for you by adding `Route::impersonate();` to `routes/ui-kit-user.php` (web + auth), which registers `impersonate` and `impersonate.leave`. `ui-kit:doctor` checks both routes exist. `<x-ui-kit::banners />` shows the exit ribbon automatically, and the admin user detail page shows the login-as button on its own (it includes `partials.impersonation-button` when the partial exists; the doctor's `impersonation button wired` row checks it). Use `@include('partials.impersonation-button', ['user' => $user])` to put the button on screens of your own. The generated `UiKitUser` trait provides `canImpersonate()` / `canBeImpersonated()`.
 
 ### `activity-log`
 Paginated admin viewer over `spatie/laravel-activitylog`: a table of when, who, event (with the log name as a small badge under it), subject and description, filtered by labelled log stream, user email and date range fields. Add the `LogsActivity` trait to models you want logged (see Spatie's docs).
@@ -401,6 +408,16 @@ In local dev, `MAIL_MAILER=log` works — mail lands in `storage/logs/laravel.lo
 ## Troubleshooting
 
 Run `php artisan ui-kit:doctor` first — it catches the common problems and prints the fix beside each failing row.
+
+**Behind a load balancer, CDN or other proxy**, tell Laravel to trust it, or every request arrives from the proxy's address. The kit's limiters key on the IP: one visitor's ten registrations an hour lock out everyone, and five bad passwords lock that email out for the whole internet. In `bootstrap/app.php`:
+
+```php
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->trustProxies(at: '10.0.0.0/8'); // your proxy's addresses, or '*' if only the proxy can reach the app
+})
+```
+
+The doctor's `trusted proxies configured` row is a skip outside production and fails in production until that call exists (`trustProxies(at: [])` says "no proxy" and passes).
 
 Every known failure, with its symptom, cause and fix command, is on the site:
 **[shipbytes.dev/docs/laravel-ui-kit/troubleshooting](https://shipbytes.dev/docs/laravel-ui-kit/troubleshooting)**.
