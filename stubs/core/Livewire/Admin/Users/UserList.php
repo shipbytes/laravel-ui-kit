@@ -24,6 +24,8 @@ class UserList extends Component
     public function render()
     {
         $users = User::query()
+            // The Admin badge asks hasRole() per row; one query, not 25.
+            ->when(method_exists(User::class, 'roles'), fn ($q) => $q->with('roles'))
             ->when($this->search !== '', function ($q) {
                 $q->where(function ($inner) {
                     $inner->where('name', 'like', "%{$this->search}%")

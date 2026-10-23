@@ -18,10 +18,7 @@
 
         @php
             $shellUser = auth()->user();
-            $shellIsAdmin = $shellUser && (
-                (method_exists($shellUser, 'hasRole') && $shellUser->hasRole('admin'))
-                || (bool) ($shellUser->is_admin ?? false)
-            );
+            $shellIsAdmin = \Shipbytes\UiKit\Support\UiKit::isAdmin($shellUser);
         @endphp
 
         <header class="border-b border-border bg-surface">
@@ -39,6 +36,13 @@
                     @endif
 
                     <x-theme-toggle />
+
+                    @if (Illuminate\Support\Facades\Route::has('profile'))
+                        <a href="{{ route('profile') }}" wire:navigate aria-label="Profile" title="Profile"
+                           class="rounded-full p-1 transition-colors hover:bg-fg/5">
+                            <x-ds::avatar size="xs" :name="$shellUser->name ?? null" :src="\Shipbytes\UiKit\Support\UiKit::avatarUrl($shellUser)" :decorative="true" />
+                        </a>
+                    @endif
 
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf

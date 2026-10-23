@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Artisan;
 use Shipbytes\UiKit\Console\Concerns\InstallsModule;
 use Shipbytes\UiKit\Support\ModuleRegistry;
 use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
@@ -70,8 +71,9 @@ class InstallCommand extends Command
         $this->runDeferredCommands();
         $this->generateUiKitUserTrait();
         $traitApplied = $this->applyUserTrait();
+        $hiddenApplied = $this->hideTwoFactorColumns();
 
-        $this->printFinalSummary($registry, $selected, $traitApplied);
+        $this->printFinalSummary($registry, $selected, $traitApplied, $hiddenApplied);
 
         return self::SUCCESS;
     }
@@ -81,7 +83,7 @@ class InstallCommand extends Command
      *
      * @param  array<int, string>  $selected
      */
-    protected function printFinalSummary(ModuleRegistry $registry, array $selected, bool $traitApplied = true): void
+    protected function printFinalSummary(ModuleRegistry $registry, array $selected, bool $traitApplied = true, bool $hiddenApplied = true): void
     {
         $this->newLine();
         $this->line('<fg=green>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</>');
@@ -100,6 +102,13 @@ class InstallCommand extends Command
             $this->line('       <fg=gray>class User extends Authenticatable {</>');
             $this->line('       <fg=gray>    use \\App\\Models\\Concerns\\UiKitUser;  // <-- add</>');
             $this->line('       <fg=gray>}</>');
+            $this->newLine();
+            $step++;
+        }
+
+        if (! $hiddenApplied) {
+            $this->line("  <fg=yellow>{$step}.</> Hide the two-factor columns so a user's JSON never carries them:");
+            $this->line('       <fg=gray>protected $hidden = [..., \'two_factor_secret\', \'two_factor_recovery_codes\'];</>');
             $this->newLine();
             $step++;
         }
@@ -248,10 +257,9 @@ class InstallCommand extends Command
      * FortifyServiceProvider.
      *
      * Flipping `views` to false tells Fortify to skip GET route
-     * registration, leaving the kit's routes unopposed. Fortify still
-     * registers its POST action routes (login/register/etc.) which the
-     * kit doesn't use directly either (Livewire handles the form POSTs),
-     * but those routes are harmless — they just sit there unused.
+     * registration, leaving the kit's routes unopposed. Fortify would still
+     * register its POST action routes, and those are not harmless (see
+     * FORTIFY_FEATURES_OFF), so the features behind them are turned off too.
      */
     protected function configureFortify(): void
     {
@@ -291,18 +299,104 @@ class InstallCommand extends Command
             $this->line('  ✓ patched <info>fortify.php</info> <comment>home=/</comment>');
         }
 
-        // The kit ships no passkey UI; leaving the feature on registers
-        // passkey endpoints that can only error. Comment it out (consumers
-        // who build their own UI can re-enable it).
-        if (str_contains($patched, 'Features::passkeys()')
-            && ! str_contains($patched, '// Features::passkeys()')) {
-            $patched = str_replace('Features::passkeys()', '// Features::passkeys()', $patched);
-            $this->line('  ✓ patched <info>fortify.php</info> <comment>passkeys feature off</comment> (kit ships no passkey UI)');
+        $patched = $this->limitFortifyFeatures($patched);
+
+        if ($patched === $contents) {
+            return;
         }
 
-        if ($patched !== $contents) {
-            file_put_contents($path, $patched);
+        file_put_contents($path, $patched);
+
+        // Every artisan command loads this file; a syntax error in it would
+        // lock the user out of the very commands that could repair it.
+        $lint = new Process([PHP_BINARY, '-l', $path]);
+        $lint->run();
+
+        if (! $lint->isSuccessful()) {
+            file_put_contents($path, $contents);
+            warning('Patching config/fortify.php produced invalid PHP, so it was left as it was. Set `views => false` and comment out the registration, resetPasswords, updateProfileInformation, updatePasswords and passkeys features yourself.');
         }
+    }
+
+    /**
+     * Fortify features whose endpoints the kit does not own. `views => false`
+     * only drops Fortify's GET pages: it still registers POST /register,
+     * POST /forgot-password, POST /reset-password, PUT /user/profile-information
+     * and PUT /user/password. Those resolve CreatesNewUsers and friends, which
+     * no kit app binds, so they 500, and a bound POST /register would skip the
+     * kit's disposable-email rule and limiter. The kit's own Livewire pages do
+     * all five jobs. Passkeys go too: the kit ships no passkey UI.
+     *
+     * emailVerification stays: the kit's routes yield to Fortify's when it is on.
+     *
+     * @var array<int, string>
+     */
+    public const FORTIFY_FEATURES_OFF = [
+        'registration',
+        'resetPasswords',
+        'updateProfileInformation',
+        'updatePasswords',
+        'passkeys',
+    ];
+
+    /**
+     * Comment out each feature in FORTIFY_FEATURES_OFF that is still live in
+     * the published config, the whole call: Fortify's stub spreads
+     * `Features::passkeys([...])` over several lines, and commenting only the
+     * first one leaves the options array behind as a syntax error. Idempotent:
+     * a commented line no longer starts with `Features::`, so a second run
+     * matches nothing.
+     */
+    protected function limitFortifyFeatures(string $contents): string
+    {
+        $disabled = [];
+
+        foreach (self::FORTIFY_FEATURES_OFF as $feature) {
+            if (! preg_match('/^[ \t]*Features::'.$feature.'\(/m', $contents, $m, PREG_OFFSET_CAPTURE)) {
+                continue;
+            }
+
+            $start = $m[0][1];
+            $end = $this->matchingParen($contents, $start + strlen($m[0][0]) - 1);
+
+            if ($end === null) {
+                continue;
+            }
+
+            // Through the trailing comma and the rest of that line.
+            $lineEnd = strpos($contents, "\n", $end);
+            $lineEnd = $lineEnd === false ? strlen($contents) : $lineEnd;
+            $call = substr($contents, $start, $lineEnd - $start);
+
+            $commented = (string) preg_replace('/^([ \t]*)/m', '$1// ', $call);
+            $contents = substr($contents, 0, $start).$commented.substr($contents, $lineEnd);
+            $disabled[] = $feature;
+        }
+
+        if ($disabled !== []) {
+            $this->line('  ✓ patched <info>fortify.php</info> <comment>features off: '.implode(', ', $disabled).'</comment> (the kit\'s own pages handle them)');
+        }
+
+        return $contents;
+    }
+
+    /**
+     * Offset of the parenthesis that closes the one at $open, or null. The
+     * config holds no strings with parentheses in them, so plain counting does.
+     */
+    protected function matchingParen(string $contents, int $open): ?int
+    {
+        $depth = 0;
+
+        for ($i = $open, $length = strlen($contents); $i < $length; $i++) {
+            if ($contents[$i] === '(') {
+                $depth++;
+            } elseif ($contents[$i] === ')' && --$depth === 0) {
+                return $i;
+            }
+        }
+
+        return null;
     }
 
     /**

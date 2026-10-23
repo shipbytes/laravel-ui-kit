@@ -51,7 +51,6 @@ class ModuleRegistry
                 ['label' => 'Support', 'route' => 'admin.support.index', 'icon' => 'ticket', 'badge' => 'open_tickets'],
             ],
             'post_install_notes' => [
-                'Optional: bind your own SidebarBadgeResolver returning [\'open_tickets\' => SupportTicket::open()->count()].',
                 'Optional: wire email notifications — the module ships without Mailables so you can plug in your own.',
             ],
         ],
@@ -114,9 +113,6 @@ class ModuleRegistry
             ],
             'artisan_publish' => [
                 ['--tag' => 'impersonate'],
-            ],
-            'post_install_notes' => [
-                'Add `@include(\'partials.impersonation-button\', [\'user\' => $user])` inside your users list/detail view next to each user row.',
             ],
         ],
         'activity-log' => [

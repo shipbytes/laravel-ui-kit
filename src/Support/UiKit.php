@@ -23,4 +23,30 @@ class UiKit
 
         return '/';
     }
+
+    /**
+     * A user's photo URL for ds::avatar's `src`, or null for the initials.
+     * avatarUrl() is generated into the UiKitUser trait by the profile module,
+     * so without that module every user gets initials.
+     */
+    public static function avatarUrl(?object $user): ?string
+    {
+        return $user !== null && method_exists($user, 'avatarUrl') ? $user->avatarUrl() : null;
+    }
+
+    /**
+     * Whether a user holds admin access: the Spatie role when the
+     * admin-middleware module put HasRoles on the model, else the is_admin
+     * column the core fallback middleware reads. Either one counts, the same
+     * as the two ways ui-kit:make-admin grants it.
+     */
+    public static function isAdmin(?object $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return (method_exists($user, 'hasRole') && $user->hasRole('admin'))
+            || (bool) ($user->is_admin ?? false);
+    }
 }

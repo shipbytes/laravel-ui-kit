@@ -14,7 +14,15 @@
     <x-ds::table :columns="['Name', 'Email', 'Verified', 'Joined', ['label' => '', 'align' => 'right']]">
         @forelse ($users as $user)
             <x-ds::table-row wire:key="user-{{ $user->id }}">
-                <x-ds::table-cell><span class="font-medium text-fg">{{ $user->name }}</span></x-ds::table-cell>
+                <x-ds::table-cell>
+                    <div class="flex items-center gap-3">
+                        <x-ds::avatar size="sm" :name="$user->name" :src="\Shipbytes\UiKit\Support\UiKit::avatarUrl($user)" :decorative="true" />
+                        <span class="font-medium text-fg">{{ $user->name }}</span>
+                        @if (\Shipbytes\UiKit\Support\UiKit::isAdmin($user))
+                            <x-ds::badge tone="accent">Admin</x-ds::badge>
+                        @endif
+                    </div>
+                </x-ds::table-cell>
                 <x-ds::table-cell>{{ $user->email }}</x-ds::table-cell>
                 <x-ds::table-cell :nowrap="true">
                     <x-ds::badge :tone="$user->email_verified_at ? 'success' : 'neutral'">{{ $user->email_verified_at ? 'Verified' : 'Pending' }}</x-ds::badge>

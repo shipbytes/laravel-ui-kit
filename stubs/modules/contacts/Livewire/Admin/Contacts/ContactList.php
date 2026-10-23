@@ -248,7 +248,7 @@ class ContactList extends Component
 
         $stats = [
             'total' => ContactSubmission::notArchived()->count(),
-            'unread' => ContactSubmission::notArchived()->where('status', 'unread')->count(),
+            'unread' => ContactSubmission::unread()->count(),
             'replied' => ContactSubmission::notArchived()->where('status', 'replied')->count(),
             'archived' => ContactSubmission::archived()->count(),
         ];

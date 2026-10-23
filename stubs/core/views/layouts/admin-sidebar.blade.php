@@ -102,7 +102,7 @@
                             {{-- Current user + logout --}}
                             <div :class="$store.sidebar.collapsed ? 'flex-col gap-1 py-1' : 'flex-row gap-2 px-2 py-1.5'"
                                  class="flex items-center">
-                                <x-ds::avatar :name="auth()->user()->name ?? null" size="sm" :title="auth()->user()->name ?? ''" />
+                                <x-ds::avatar :name="auth()->user()->name ?? null" :src="\Shipbytes\UiKit\Support\UiKit::avatarUrl(auth()->user())" size="sm" :title="auth()->user()->name ?? ''" />
                                 <div x-show="!$store.sidebar.collapsed" class="min-w-0 flex-1">
                                     <div class="truncate text-meta font-medium text-fg">{{ auth()->user()->name ?? '' }}</div>
                                     @if (Illuminate\Support\Facades\Route::has('profile'))
@@ -143,6 +143,7 @@
                         :href="route($item['route'])"
                         :label="$item['label']"
                         :active="$isActive($item)"
+                        :badge="isset($item['badge']) ? ($badges[$item['badge']] ?? null) : null"
                         wire:navigate
                     >
                         <x-slot:icon><x-ds::icon :name="$item['icon'] ?? 'squares-2x2'" size="6" /></x-slot:icon>
@@ -167,6 +168,24 @@
                             <x-slot:icon><x-ds::icon :name="$item['icon'] ?? 'squares-2x2'" size="5" /></x-slot:icon>
                         </x-ds::sheet-item>
                     @endforeach
+
+                    {{-- The rail's footer, which a phone never sees. --}}
+                    <div class="mt-2 border-t border-divider pt-2">
+                        @if (Illuminate\Support\Facades\Route::has('profile'))
+                            <x-ds::sheet-item :href="route('profile')" label="Profile" wire:navigate @click="moreSheetOpen = false">
+                                <x-slot:icon><x-ds::icon name="user-circle" size="5" /></x-slot:icon>
+                            </x-ds::sheet-item>
+                        @endif
+                        <x-ds::sheet-item :href="\Shipbytes\UiKit\Support\UiKit::homeUrl()" label="Back to site" wire:navigate @click="moreSheetOpen = false">
+                            <x-slot:icon><x-ds::icon name="arrow-left" size="5" /></x-slot:icon>
+                        </x-ds::sheet-item>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <x-ds::sheet-item as="button" label="Log out" tone="danger">
+                                <x-slot:icon><x-ds::icon name="arrow-right-start-on-rectangle" size="5" /></x-slot:icon>
+                            </x-ds::sheet-item>
+                        </form>
+                    </div>
                 </div>
             </x-ds::sheet>
         </div>

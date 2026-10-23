@@ -2,8 +2,15 @@
 
 namespace Shipbytes\UiKit\Tests\Feature;
 
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Route;
+use Laravel\Fortify\Features;
 use Orchestra\Testbench\Attributes\UsesVendor;
+use Shipbytes\UiKit\Contracts\SidebarBadgeResolver;
+use Shipbytes\UiKit\Support\DefaultBadgeResolver;
+use Shipbytes\UiKit\Support\NullBadgeResolver;
+use Shipbytes\UiKit\Tests\Fixtures\HidesTwoFactorUser;
 use Shipbytes\UiKit\Tests\TestCase;
 
 /**
@@ -224,6 +231,132 @@ PHP);
         $this->assertMatchesRegularExpression('/nav icons are Heroicons\s*\|\s*✗ fail\s*\|.*Dashboard => grid, Changelog => note\./u', $output);
         $this->assertStringContainsString('grid → squares-2x2', $output);
         $this->assertStringNotContainsString('Users => users', $output);
+    }
+
+    public function test_fortify_features_beyond_two_factor_fail(): void
+    {
+        $check = 'fortify features limited to two-factor';
+        file_put_contents(config_path('fortify.php'), "<?php\n\nreturn ['views' => false];\n");
+
+        config(['fortify.features' => [Features::emailVerification(), Features::twoFactorAuthentication()]]);
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✓ pass/u", $this->doctor());
+
+        config(['fortify.features' => [Features::registration(), Features::updatePasswords(), Features::twoFactorAuthentication()]]);
+        $output = $this->doctor();
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|\\s*comment out Features::registration\\(\\), Features::updatePasswords\\(\\) in config\\/fortify\\.php/u", $output);
+    }
+
+    public function test_fortifys_two_factor_redirect_needs_its_route(): void
+    {
+        $check = 'two-factor\\.login route registered';
+        file_put_contents(config_path('fortify.php'), "<?php\n\nreturn ['views' => false];\n");
+
+        config(['fortify.features' => []]);
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*– skip/u", $this->doctor());
+
+        config(['fortify.features' => [Features::twoFactorAuthentication()]]);
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|\\s*add Route::redirect\\('two-factor-login'/u", $this->doctor());
+
+        Route::redirect('two-factor-login', '/two-factor-challenge')->name('two-factor.login');
+        Route::getRoutes()->refreshNameLookups();
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✓ pass/u", $this->doctor());
+    }
+
+    public function test_two_factor_columns_must_be_hidden_when_the_profile_module_is_on(): void
+    {
+        $check = 'two-factor columns hidden on the User model';
+        config(['ui-kit.installed_modules' => ['profile']]);
+
+        // The framework's base user hides nothing.
+        config(['auth.providers.users.model' => User::class]);
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|\\s*add 'two_factor_secret' and 'two_factor_recovery_codes' to \\\$hidden/u", $this->doctor());
+
+        config(['auth.providers.users.model' => HidesTwoFactorUser::class]);
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✓ pass/u", $this->doctor());
+
+        config(['ui-kit.installed_modules' => []]);
+        $this->assertStringNotContainsString($check, $this->doctor(), 'no profile module, no two-factor columns to hide');
+    }
+
+    public function test_a_badge_the_resolver_never_returns_fails(): void
+    {
+        $check = 'sidebar badges resolve';
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*– skip/u", $this->doctor());
+
+        config(['admin.nav' => [['label' => 'Support', 'route' => 'admin.support.index', 'icon' => 'ticket', 'badge' => 'open_tickets']]]);
+
+        $this->app->instance(SidebarBadgeResolver::class, new class implements SidebarBadgeResolver
+        {
+            public function counts(): array
+            {
+                return ['open_tickets' => 0];
+            }
+        });
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✓ pass/u", $this->doctor());
+
+        // An app's own resolver that forgot the key: nothing else would ever say so.
+        $this->app->instance(SidebarBadgeResolver::class, new NullBadgeResolver);
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|.*NullBadgeResolver returns no count for Support => open_tickets/u", $this->doctor());
+
+        // The kit's own resolver, whose count threw (a table never migrated).
+        $this->app->instance(SidebarBadgeResolver::class, new class extends DefaultBadgeResolver
+        {
+            protected function compute(): array
+            {
+                $this->failures['open_tickets'] = 'no such table: support_tickets';
+
+                return [];
+            }
+        });
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|\\s*could not count open_tickets: no such table: support_tickets\\. Run php artisan migrate/u", $this->doctor());
+    }
+
+    public function test_the_impersonation_button_must_be_wired_when_the_module_is_on(): void
+    {
+        $check = 'impersonation button wired';
+        config(['ui-kit.installed_modules' => ['impersonation']]);
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|.*impersonation-button\\.blade\\.php is missing/u", $this->doctor());
+
+        @mkdir(resource_path('views/partials'), 0755, true);
+        copy(__DIR__.'/../../stubs/modules/impersonation/views/partials/impersonation-button.blade.php', resource_path('views/partials/impersonation-button.blade.php'));
+        @mkdir(resource_path('views/livewire/admin/users'), 0755, true);
+        file_put_contents(resource_path('views/livewire/admin/users/user-detail.blade.php'), "<div>{{ \$user->name }}</div>\n");
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|.*the user detail page never shows it/u", $this->doctor());
+
+        copy(__DIR__.'/../../stubs/core/views/livewire/admin/users/user-detail.blade.php', resource_path('views/livewire/admin/users/user-detail.blade.php'));
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✓ pass/u", $this->doctor());
+
+        @unlink(resource_path('views/partials/impersonation-button.blade.php'));
+        @rmdir(resource_path('views/partials'));
+    }
+
+    public function test_trusted_proxies_pass_skip_or_fail(): void
+    {
+        $check = 'trusted proxies configured';
+        $app = base_path('bootstrap/app.php');
+        $original = (string) file_get_contents($app);
+
+        try {
+            $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*– skip\\s*\\|\\s*not production/u", $this->doctor());
+
+            $this->app['env'] = 'production';
+            $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|.*trustProxies\\(at:/u", $this->doctor());
+
+            // Only the text is read; the file is put back before anything loads it.
+            file_put_contents($app, $original."\n// \$middleware->trustProxies(at: '*');\n");
+            $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail/u", $this->doctor(), 'a commented-out call is not a configuration');
+
+            file_put_contents($app, $original."\n\$middleware->trustProxies(at: '*');\n");
+            $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✓ pass/u", $this->doctor());
+        } finally {
+            file_put_contents($app, $original);
+            $this->app['env'] = 'testing';
+        }
     }
 
     private function doctor(): string

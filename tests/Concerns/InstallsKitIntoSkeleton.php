@@ -3,7 +3,9 @@
 namespace Shipbytes\UiKit\Tests\Concerns;
 
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\Route;
+use Laravel\Fortify\FortifyServiceProvider;
 use Livewire\Livewire;
 use Shipbytes\UiKit\UiKitServiceProvider;
 
@@ -17,7 +19,12 @@ trait InstallsKitIntoSkeleton
 {
     private static bool $autoloaderRegistered = false;
 
-    protected function installKit(string $modules): void
+    /**
+     * @param  bool  $verifiesEmail  make the User model MustVerifyEmail. The
+     *                               class loads once per process, so a test class that passes true has
+     *                               to run its tests in separate processes.
+     */
+    protected function installKit(string $modules, bool $verifiesEmail = false): void
     {
         $this->withoutVite();
 
@@ -40,22 +47,35 @@ trait InstallsKitIntoSkeleton
 
         // A minimal host-app User model, as every real app has.
         (new Filesystem)->ensureDirectoryExists(app_path('Models'));
-        file_put_contents(app_path('Models/User.php'), <<<'PHP'
+        $implements = $verifiesEmail ? ' implements \\Illuminate\\Contracts\\Auth\\MustVerifyEmail' : '';
+
+        file_put_contents(app_path('Models/User.php'), <<<PHP
 <?php
 
-namespace App\Models;
+namespace App\\Models;
 
-use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\\Foundation\\Auth\\User as Authenticatable;
+use Illuminate\\Notifications\\Notifiable;
 
-class User extends Authenticatable
+class User extends Authenticatable{$implements}
 {
-    protected $table = 'users';
+    use Notifiable;
 
-    // The skeleton's own list. NOT $guarded = []: that hid a profile stub
+    protected \$table = 'users';
+
+    // The skeleton's own list. NOT \$guarded = []: that hid a profile stub
     // that mass-assigned avatar_path, which a real app silently drops.
-    protected $fillable = ['name', 'email', 'password'];
+    protected \$fillable = ['name', 'email', 'password'];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected \$hidden = ['password', 'remember_token'];
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
 }
 PHP);
 
@@ -74,11 +94,41 @@ PHP);
 
         Livewire::addLocation(viewPath: resource_path('views/livewire'));
 
+        $this->rebootFortifyRoutes();
+
         $provider = new UiKitServiceProvider($this->app);
         $ref = new \ReflectionMethod($provider, 'registerRoutes');
         $ref->setAccessible(true);
         $ref->invoke($provider);
 
         Route::getRoutes()->refreshNameLookups();
+    }
+
+    /**
+     * Fortify registered its routes at boot from its own default config, with
+     * every feature on. A real app boots with the config the installer just
+     * patched, so drop Fortify's routes and register them again from that.
+     * Everything else (Livewire's update endpoint included) stays.
+     */
+    private function rebootFortifyRoutes(): void
+    {
+        if (! $this->app->providerIsLoaded(FortifyServiceProvider::class) || ! file_exists(config_path('fortify.php'))) {
+            return;
+        }
+
+        config(['fortify' => require config_path('fortify.php')]);
+
+        $kept = new RouteCollection;
+
+        foreach (Route::getRoutes()->getRoutes() as $route) {
+            if (! str_starts_with((string) $route->getActionName(), 'Laravel\\Fortify\\')) {
+                $kept->add($route);
+            }
+        }
+
+        Route::setRoutes($kept);
+
+        $ref = new \ReflectionMethod(FortifyServiceProvider::class, 'configureRoutes');
+        $ref->invoke(new FortifyServiceProvider($this->app));
     }
 }

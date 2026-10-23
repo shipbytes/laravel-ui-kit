@@ -2,8 +2,10 @@
 
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -59,20 +61,21 @@ new class extends Component
             Storage::disk('public')->delete($user->avatar_path);
         }
 
-        // Derive the extension from the file's actual MIME type — never from
-        // the client-supplied filename, which could smuggle a .php suffix
-        // onto the public disk.
-        $extension = $this->avatar->extension() ?: 'jpg';
-        $path = 'avatars/'.$user->getKey().'.'.$extension;
+        // A random name rather than the user's key: a key-based path is
+        // guessable, so anyone could walk avatars/1.jpg, avatars/2.jpg, ... on
+        // the public disk. The extension comes from the file's actual MIME
+        // type, never the client's filename, which could smuggle in a .php.
+        $name = Str::random(40);
 
         if (class_exists(\Intervention\Image\ImageManager::class)) {
             $manager = \Intervention\Image\ImageManager::gd();
             $image = $manager->read($this->avatar->getRealPath());
             $image->cover(200, 200);
-            Storage::disk('public')->put('avatars/'.$user->getKey().'.jpg', $image->toJpeg(85));
-            $path = 'avatars/'.$user->getKey().'.jpg';
+            $path = "avatars/{$name}.jpg";
+            Storage::disk('public')->put($path, $image->toJpeg(85));
         } else {
-            Storage::disk('public')->putFileAs('avatars', $this->avatar, $user->getKey().'.'.$extension);
+            $path = "avatars/{$name}.".($this->avatar->extension() ?: 'jpg');
+            Storage::disk('public')->putFileAs('avatars', $this->avatar, basename($path));
         }
 
         // forceFill, not update(): avatar_path is not in a stock User's
@@ -113,6 +116,17 @@ new class extends Component
             return;
         }
 
+        // Six a minute per user, shared with the verify-email page.
+        $throttleKey = 'verification-resend:'.$user->getKey();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 6)) {
+            Session::flash('status', 'verification-throttled');
+
+            return;
+        }
+
+        RateLimiter::hit($throttleKey, 60);
+
         $user->sendEmailVerificationNotification();
 
         Session::flash('status', 'verification-link-sent');
@@ -135,8 +149,7 @@ new class extends Component
         // else nothing (ds::avatar falls back to the initials).
         $avatarUrl = match (true) {
             $avatar instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile && $avatar->isPreviewable() => $avatar->temporaryUrl(),
-            (bool) auth()->user()->avatar_path => \Illuminate\Support\Facades\Storage::disk('public')->url(auth()->user()->avatar_path),
-            default => null,
+            default => \Shipbytes\UiKit\Support\UiKit::avatarUrl(auth()->user()),
         };
     @endphp
 
@@ -185,6 +198,8 @@ new class extends Component
 
                     @if (session('status') === 'verification-link-sent')
                         <x-ds::alert tone="success">{{ __('A new verification link has been sent.') }}</x-ds::alert>
+                    @elseif (session('status') === 'verification-throttled')
+                        <x-ds::alert tone="warning">{{ __('Too many requests. Please wait a minute before asking for another link.') }}</x-ds::alert>
                     @endif
                 </div>
             @endif

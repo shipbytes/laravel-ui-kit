@@ -72,6 +72,7 @@ class InstallModuleCommand extends Command
             if (array_intersect($slugs, ['admin-middleware', 'impersonation', 'profile']) !== []) {
                 $this->generateUiKitUserTrait();
                 $this->applyUserTrait();
+                $this->hideTwoFactorColumns();
             }
         }
 

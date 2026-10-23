@@ -15,6 +15,10 @@ Route::middleware('guest')->group(function () {
 
     if (Features::enabled(Features::twoFactorAuthentication())) {
         Route::livewire('two-factor-challenge', 'pages.auth.two-factor-challenge')->name('two-factor.challenge');
+
+        // Fortify's own POST /login sends a two-factor user to this name. The
+        // page picks up the login Fortify staged in the session.
+        Route::redirect('two-factor-login', '/two-factor-challenge')->name('two-factor.login');
     }
 });
 

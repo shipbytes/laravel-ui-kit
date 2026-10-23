@@ -5,6 +5,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
@@ -31,8 +32,6 @@ new #[Layout('layouts.guest')] class extends Component
             ]);
         }
 
-        RateLimiter::hit($throttleKey, 3600);
-
         $emailRules = ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class];
 
         if (config('ui-kit.features.disposable_email_block')) {
@@ -40,18 +39,25 @@ new #[Layout('layouts.guest')] class extends Component
         }
 
         $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s\'\-\.]+$/u'],
             'email' => $emailRules,
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
         ], [
+            'name.regex' => 'Your name can only contain letters, spaces, apostrophes, hyphens and full stops.',
             'email.indisposable' => 'Please use a permanent email address. Disposable emails are not allowed.',
         ]);
+
+        // Counted only once an account exists: a submit that fails validation
+        // (a typo, a taken email) must not use up one of the hour's ten.
+        RateLimiter::hit($throttleKey, 3600);
 
         $validated['password'] = Hash::make($validated['password']);
 
         event(new Registered($user = User::create($validated)));
 
         Auth::login($user);
+
+        Session::regenerate();
 
         $this->redirectIntended(default: UiKit::homeUrl(), navigate: true);
     }
