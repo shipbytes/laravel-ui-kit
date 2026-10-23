@@ -265,6 +265,19 @@ CSS;
         );
     }
 
+    public function test_final_summary_prints_the_layout_tags_unescaped(): void
+    {
+        $this->loadLaravelMigrations();
+
+        $this->artisan('ui-kit:install', ['--no-interaction' => true])
+            ->expectsOutputToContain('<x-ui-kit::head />')
+            ->expectsOutputToContain('</body>')
+            ->expectsOutputToContain('npm install && npm run dev')
+            ->doesntExpectOutputToContain('&lt;')
+            ->doesntExpectOutputToContain('&amp;')
+            ->assertSuccessful();
+    }
+
     public function test_unknown_module_aborts_with_failure(): void
     {
         $this->artisan('ui-kit:install', ['--modules' => 'does-not-exist', '--no-interaction' => true])
