@@ -39,7 +39,7 @@ Modules that ship models also ship **factories**, so `SupportTicket::factory()` 
 - PHP 8.2+
 - Laravel 12 (Laravel 13 supported in composer constraints; CI leg is experimental)
 - Livewire 4.4+ (installed with the kit)
-- `shipbytes/blade-ui` ^1.2.2, the design system (installed with the kit)
+- `shipbytes/blade-ui` ^1.3, the design system (installed with the kit)
 - Tailwind CSS v4 (the default in fresh Laravel 12 apps)
 - Node 18+ (for the Vite build)
 
@@ -290,7 +290,7 @@ localStorage as `ui-kit.theme`.
 ```
 
 Modules append their own entries automatically between the `/* ui-kit:nav-* */` markers.
-`icon` is a [Heroicons v2](https://heroicons.com) outline name (`squares-2x2`, `document-text`, `envelope`, `chart-bar`…), rendered through `ds::icon`; any icon on heroicons.com works, and `ui-kit:doctor` flags a name that doesn't resolve.
+`icon` is a [Heroicons v2](https://heroicons.com) outline name (`squares-2x2`, `document-text`, `envelope`, `chart-bar`…), rendered through `ds::icon`; any icon on heroicons.com works, and `ui-kit:doctor` flags a name that doesn't resolve. Until it is fixed, that entry shows a question-mark icon and the log gets one `blade-ui: icon "…" not found` warning per request; the rest of the admin works.
 
 ### Your own admin screens
 

@@ -10,6 +10,30 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Fixed
+
+- **An unknown nav icon no longer takes down the admin.** An `icon` in
+  `config/admin.php` that is not a Heroicons v2 name (a 0.3 app's `grid`, a
+  typo) threw `Unable to locate a class or view for component [heroicon-o-grid]`,
+  so every admin page was a 500, including the one where you would fix it. The
+  sidebar, the phone bar and the More sheet now draw a **question-mark icon** for
+  that entry and the rest of the page works. The log gets one warning per request
+  per name, `blade-ui: icon "grid" not found, rendered "question-mark-circle"`, and
+  `php artisan ui-kit:doctor` fails the `nav icons are Heroicons` row naming the
+  entry (`Dashboard => grid`) and its v2 name. The sidebar is a published view,
+  so an existing app picks this up by adding `fallback="question-mark-circle"` to
+  the three `ds::icon` calls that take `$item['icon']` in
+  `resources/views/layouts/admin-sidebar.blade.php`, or by republishing the core
+  views (`php artisan vendor:publish --tag=ui-kit-views --force`, which
+  overwrites every published core view, so commit first).
+
+### Changed
+
+- Requires `shipbytes/blade-ui` ^1.3, whose `ds::icon` gained the opt-in
+  `fallback` used above. The doctor's nav icon check now asks the design system
+  (`Icons::exists()`) instead of looking for svg files, so it resolves aliases
+  and variants exactly as the sidebar does.
+
 ## [0.5.1] - 2026-10-23
 
 ### Fixed
