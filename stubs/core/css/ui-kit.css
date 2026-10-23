@@ -10,9 +10,10 @@
  * resources/css/ that is ../../vendor/…, the same path the design system's own
  * docs give for app.css, because both files sit in the same directory.
  *
- * The @source line is not optional. Tailwind does not scan vendor/, so without
- * it every class the ds:: components emit is discarded and they render as
- * unstyled HTML, with no error anywhere.
+ * The @source lines are not optional. Tailwind does not scan vendor/, so without
+ * them every class the ds:: components emit is discarded and they render as
+ * unstyled HTML, with no error anywhere. The second is the kit's own package
+ * views (<x-ui-kit::page-header> and friends), which are not published either.
  *
  * To override a token (the accent colour, say), redefine its --ds-* variable
  * in app.css AFTER the ui-kit.css import, e.g. `:root { --ds-accent: … }`.
@@ -21,10 +22,8 @@
 @import '../../vendor/shipbytes/blade-ui/dist/tokens.css';
 @import '../../vendor/shipbytes/blade-ui/dist/theme.css';
 @source '../../vendor/shipbytes/blade-ui/resources/views';
+@source '../../vendor/shipbytes/laravel-ui-kit/resources/views';
 
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 
-/* Native form controls that have not yet moved to ds::checkbox / ds::radio.
-   Removed in Phase 4 together with the last raw <input>. */
-input[type='checkbox'], input[type='radio'] { accent-color: var(--ds-accent); }

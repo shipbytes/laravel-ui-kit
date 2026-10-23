@@ -8,11 +8,11 @@ use App\Models\TicketReply;
 use App\Models\User;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Livewire\WithPagination;
+use Shipbytes\UiKit\Livewire\Concerns\WithDesignSystemPagination;
 
 class ContactList extends Component
 {
-    use WithPagination;
+    use WithDesignSystemPagination;
 
     public string $search = '';
 

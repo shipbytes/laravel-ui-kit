@@ -237,6 +237,16 @@ class DoctorCommand extends Command
             } else {
                 $this->failCheck('ui-kit.css imports the design system', 'php artisan vendor:publish --tag=ui-kit-assets --force (the 0.3 file imported ./ui-kit-theme.css instead)');
             }
+
+            // The admin screens' page header is a package view, so its classes
+            // exist only if Tailwind scans the kit in vendor/. Without it the
+            // header renders with whatever classes a published view happens to
+            // share, which looks almost right.
+            if (str_contains($contents, 'laravel-ui-kit/resources/views')) {
+                $this->passCheck("ui-kit.css scans the kit's own views");
+            } else {
+                $this->failCheck("ui-kit.css scans the kit's own views", 'php artisan vendor:publish --tag=ui-kit-assets --force (ui-kit.css from before 0.4 lacks the @source line for vendor/shipbytes/laravel-ui-kit/resources/views)');
+            }
         }
 
         if (file_exists(resource_path('css/ui-kit-theme.css'))) {
@@ -247,6 +257,7 @@ class DoctorCommand extends Command
 
         $this->checkFontOverride();
         $this->checkNavIcons();
+        $this->checkAdminPagination();
     }
 
     /**
@@ -274,6 +285,44 @@ class DoctorCommand extends Command
             $this->skipCheck($check, 'you override the font; make sure it is loaded');
         } else {
             $this->passCheck($check);
+        }
+    }
+
+    /**
+     * The published admin lists page through WithDesignSystemPagination. One
+     * still on plain WithPagination renders Livewire's own Tailwind pager,
+     * palette colours and all, which works and looks foreign; nothing errors.
+     */
+    protected function checkAdminPagination(): void
+    {
+        $check = 'admin lists paginate with the design system';
+        $dir = app_path('Livewire/Admin');
+
+        if (! is_dir($dir)) {
+            $this->skipCheck($check, 'app/Livewire/Admin not published');
+
+            return;
+        }
+
+        $stale = [];
+
+        foreach ((new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS))) as $file) {
+            /** @var \SplFileInfo $file */
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $contents = (string) file_get_contents($file->getPathname());
+
+            if (preg_match('/^\s*use\s+WithPagination\s*;/m', $contents) && ! str_contains($contents, 'function paginationView')) {
+                $stale[] = $file->getBasename('.php');
+            }
+        }
+
+        if ($stale === []) {
+            $this->passCheck($check);
+        } else {
+            $this->failCheck($check, implode(', ', $stale).': replace `use WithPagination;` with `use \\Shipbytes\\UiKit\\Livewire\\Concerns\\WithDesignSystemPagination;`, or republish with php artisan ui-kit:install --force');
         }
     }
 

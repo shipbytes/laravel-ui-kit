@@ -134,6 +134,40 @@ PHP);
         $this->assertMatchesRegularExpression('/ui-kit\.css imports the design system\s*\|\s*✓ pass/u', $this->doctor());
     }
 
+    public function test_ui_kit_css_without_the_kit_source_line_fails(): void
+    {
+        @mkdir(resource_path('css'), 0755, true);
+
+        // A ui-kit.css on the design system that scans only blade-ui's views.
+        file_put_contents(resource_path('css/ui-kit.css'), str_replace(
+            "@source '../../vendor/shipbytes/laravel-ui-kit/resources/views';\n",
+            '',
+            (string) file_get_contents(__DIR__.'/../../stubs/core/css/ui-kit.css')
+        ));
+
+        $this->assertMatchesRegularExpression("/ui-kit\\.css scans the kit's own views\\s*\\|\\s*✗ fail\\s*\\|.*vendor:publish --tag=ui-kit-assets --force/u", $this->doctor());
+
+        copy(__DIR__.'/../../stubs/core/css/ui-kit.css', resource_path('css/ui-kit.css'));
+
+        $this->assertMatchesRegularExpression("/ui-kit\\.css scans the kit's own views\\s*\\|\\s*✓ pass/u", $this->doctor());
+    }
+
+    public function test_admin_list_on_plain_with_pagination_fails(): void
+    {
+        $check = 'admin lists paginate with the design system';
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*– skip/u", $this->doctor());
+
+        @mkdir(app_path('Livewire/Admin/Users'), 0755, true);
+        file_put_contents(app_path('Livewire/Admin/Users/UserList.php'), "<?php\n\nnamespace App\\Livewire\\Admin\\Users;\n\nuse Livewire\\Component;\nuse Livewire\\WithPagination;\n\nclass UserList extends Component\n{\n    use WithPagination;\n}\n");
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✗ fail\\s*\\|\\s*UserList: replace/u", $this->doctor());
+
+        copy(__DIR__.'/../../stubs/core/Livewire/Admin/Users/UserList.php', app_path('Livewire/Admin/Users/UserList.php'));
+
+        $this->assertMatchesRegularExpression("/{$check}\\s*\\|\\s*✓ pass/u", $this->doctor());
+    }
+
     public function test_leftover_theme_file_fails(): void
     {
         $this->assertMatchesRegularExpression('/no leftover ui-kit-theme\.css\s*\|\s*✓ pass/u', $this->doctor());
